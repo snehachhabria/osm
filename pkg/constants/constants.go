@@ -94,6 +94,9 @@ const (
 	// WebhookCertificateSecretName is the default value for webhook secret name
 	WebhookCertificateSecretName = "mutating-webhook-cert-secret"
 
+	// WebhookCertificateSecretName is the default value for webhook secret name
+	ConversionWebhookCertificateSecretName = "conversion-webhook-cert-secret"
+
 	// RegexMatchAll is a regex pattern match for all
 	RegexMatchAll = ".*"
 

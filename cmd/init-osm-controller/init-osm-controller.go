@@ -10,7 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha1"
+	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha2"
 	configClientset "github.com/openservicemesh/osm/pkg/gen/client/config/clientset/versioned"
 	"github.com/openservicemesh/osm/pkg/logger"
 	"github.com/openservicemesh/osm/pkg/version"
@@ -55,8 +55,8 @@ func validateCLIParams() error {
 	return nil
 }
 
-func createDefaultMeshConfig(presetMeshConfig *v1alpha1.MeshConfig) *v1alpha1.MeshConfig {
-	return &v1alpha1.MeshConfig{
+func createDefaultMeshConfig(presetMeshConfig *v1alpha2.MeshConfig) *v1alpha2.MeshConfig {
+	return &v1alpha2.MeshConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "MeshConfig",
 			APIVersion: "config.openservicemesh.io/v1alpha1",
@@ -92,7 +92,7 @@ func main() {
 		return
 	}
 
-	presetMeshConfig, presetConfigErr := configClient.ConfigV1alpha1().MeshConfigs(osmNamespace).Get(context.TODO(), presetMeshConfigName, metav1.GetOptions{})
+	presetMeshConfig, presetConfigErr := configClient.ConfigV1alpha2().MeshConfigs(osmNamespace).Get(context.TODO(), presetMeshConfigName, metav1.GetOptions{})
 	_, meshConfigErr := configClient.ConfigV1alpha1().MeshConfigs(osmNamespace).Get(context.TODO(), meshConfigName, metav1.GetOptions{})
 
 	// If the presetMeshConfig could not be loaded and a default meshConfig doesn't exist, return the error
@@ -103,11 +103,20 @@ func main() {
 
 	defaultMeshConfig := createDefaultMeshConfig(presetMeshConfig)
 
-	if createdMeshConfig, err := configClient.ConfigV1alpha1().MeshConfigs(osmNamespace).Create(context.TODO(), defaultMeshConfig, metav1.CreateOptions{}); err == nil {
+	log.Info().Msgf("TEST going to attempt to read old mesh config")
+	meshConfig, err := configClient.ConfigV1alpha2().MeshConfigs(osmNamespace).Get(context.TODO(), "osm-mesh-config", metav1.GetOptions{})
+	if err != nil {
+		log.Fatal().Err(err).Msgf("TEST Cannot ready v1 version of meshconfig")
+	}
+
+	log.Info().Msgf("TEST read v1alpha1 version of mesh config : %v", meshConfig)
+
+	if createdMeshConfig, err := configClient.ConfigV1alpha2().MeshConfigs(osmNamespace).Create(context.TODO(), defaultMeshConfig, metav1.CreateOptions{}); err == nil {
 		log.Info().Msgf("MeshConfig created in %s, %v", osmNamespace, createdMeshConfig)
 	} else if apierrors.IsAlreadyExists(err) {
 		log.Info().Msgf("MeshConfig already exists in %s. Skip creating.", osmNamespace)
 	} else {
 		log.Fatal().Err(err).Msgf("Error creating default MeshConfig")
 	}
+
 }

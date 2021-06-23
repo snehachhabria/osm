@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha1"
+	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha2"
 	testclient "github.com/openservicemesh/osm/pkg/gen/client/config/clientset/versioned/fake"
 
 	"github.com/openservicemesh/osm/pkg/announcements"
@@ -72,8 +73,8 @@ func TestCreateUpdateConfig(t *testing.T) {
 				},
 			},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
-				expectedConfig := &v1alpha1.MeshConfigSpec{
-					Sidecar: v1alpha1.SidecarSpec{
+				expectedConfig := &v1alpha2.MeshConfigSpec{
+					Sidecar: v1alpha2.SidecarSpec{
 						EnablePrivilegedInitContainer: true,
 						LogLevel:                      "error",
 						MaxDataPlaneConnections:       0,
@@ -81,18 +82,18 @@ func TestCreateUpdateConfig(t *testing.T) {
 						EnvoyImage:                    "envoyproxy/envoy-alpine:v0.0.0",
 						InitContainerImage:            "openservicemesh/init:v0.0.0",
 					},
-					Traffic: v1alpha1.TrafficSpec{
+					Traffic: v1alpha2.TrafficSpec{
 						EnablePermissiveTrafficPolicyMode: false,
 						EnableEgress:                      true,
 						UseHTTPSIngress:                   true,
 					},
-					Observability: v1alpha1.ObservabilitySpec{
+					Observability: v1alpha2.ObservabilitySpec{
 						EnableDebugServer: true,
-						Tracing: v1alpha1.TracingSpec{
+						Tracing: v1alpha2.TracingSpec{
 							Enable: true,
 						},
 					},
-					Certificate: v1alpha1.CertificateSpec{
+					Certificate: v1alpha2.CertificateSpec{
 						ServiceCertValidityDuration: "24h",
 					},
 				}

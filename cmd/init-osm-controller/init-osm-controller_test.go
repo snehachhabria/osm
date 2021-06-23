@@ -6,13 +6,13 @@ import (
 	tassert "github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha1"
+	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha2"
 )
 
 func TestCreateDefaultMeshConfig(t *testing.T) {
 	assert := tassert.New(t)
 
-	presetMeshConfig := &v1alpha1.MeshConfig{
+	presetMeshConfig := &v1alpha2.MeshConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "MeshConfig",
 			APIVersion: "config.openservicemesh.io/v1alpha1",
@@ -20,8 +20,8 @@ func TestCreateDefaultMeshConfig(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: presetMeshConfigName,
 		},
-		Spec: v1alpha1.MeshConfigSpec{
-			Sidecar: v1alpha1.SidecarSpec{
+		Spec: v1alpha2.MeshConfigSpec{
+			Sidecar: v1alpha2.SidecarSpec{
 				LogLevel:                      "error",
 				EnvoyImage:                    "envoyproxy/envoy-alpine:v1.18.3",
 				InitContainerImage:            "openservicemesh/init:v0.8.4",
@@ -29,18 +29,18 @@ func TestCreateDefaultMeshConfig(t *testing.T) {
 				MaxDataPlaneConnections:       0,
 				ConfigResyncInterval:          "2s",
 			},
-			Traffic: v1alpha1.TrafficSpec{
+			Traffic: v1alpha2.TrafficSpec{
 				EnableEgress:                      true,
 				UseHTTPSIngress:                   false,
 				EnablePermissiveTrafficPolicyMode: true,
 			},
-			Observability: v1alpha1.ObservabilitySpec{
+			Observability: v1alpha2.ObservabilitySpec{
 				EnableDebugServer: false,
-				Tracing: v1alpha1.TracingSpec{
+				Tracing: v1alpha2.TracingSpec{
 					Enable: false,
 				},
 			},
-			Certificate: v1alpha1.CertificateSpec{
+			Certificate: v1alpha2.CertificateSpec{
 				ServiceCertValidityDuration: "24h",
 			},
 		},

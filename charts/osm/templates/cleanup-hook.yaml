@@ -1,28 +1,22 @@
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: Pod
 metadata:
   name: {{ .Release.Name }}-cleanup
   namespace: {{ include "osm.namespace" . }}
-  labels:
-    {{- include "osm.labels" . | nindent 4 }}
   annotations:
     helm.sh/hook: post-delete
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  labels:
+    {{- include "osm.labels" . | nindent 4 }}
 spec:
-  template:
-    metadata:
-      name: {{ .Release.Name }}-cleanup
-      labels:
-        {{- include "osm.labels" . | nindent 8 }}
-    spec:
-      serviceAccountName: {{ .Release.Name }}-cleanup
-      restartPolicy: Never
-      containers:
-        - name: garbage-collector
-          image: bitnami/kubectl
-          imagePullPolicy: IfNotPresent
-          command:
+  serviceAccountName: {{ .Release.Name }}-cleanup
+  restartPolicy: OnFailure
+  containers:
+  - name: garbage-collector
+    image: bitnami/kubectl
+    imagePullPolicy: IfNotPresent
+    command:
             - sh
             - -c
             - >
              kubectl delete --ignore-not-found meshconfig -n '{{ include "osm.namespace" . }}' osm-mesh-config;
+             kubectl delete crd meshconfigs.config.openservicemesh.io --ignore-not-found;

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: osm-crd-conversion-webhook
+  namespace: {{ include "osm.namespace" . }}
+  labels:
+    {{- include "osm.labels" . | nindent 4 }}
+    app: osm-crd-conversion-webhook
+spec:
+  ports:
+    - name: tls
+      port: 443
+      targetPort: tls
+  selector:
+    app: osm-crd-conversion-webhook

@@ -6,7 +6,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/openservicemesh/osm/pkg/announcements"
-	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha1"
+	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha2"
 	"github.com/openservicemesh/osm/pkg/gen/client/config/clientset/versioned"
 	informers "github.com/openservicemesh/osm/pkg/gen/client/config/informers/externalversions"
 	k8s "github.com/openservicemesh/osm/pkg/kubernetes"
@@ -32,7 +32,7 @@ func newConfigurator(meshConfigClientSet versioned.Interface, stop <-chan struct
 		k8s.DefaultKubeEventResyncInterval,
 		informers.WithNamespace(osmNamespace),
 	)
-	informer := informerFactory.Config().V1alpha1().MeshConfigs().Informer()
+	informer := informerFactory.Config().V1alpha2().MeshConfigs().Informer()
 	client := Client{
 		informer:       informer,
 		cache:          informer.GetStore(),
@@ -131,8 +131,8 @@ func meshConfigDeletedMessageHandler(psubMsg *events.PubSubMessage) {
 
 func meshConfigUpdatedMessageHandler(psubMsg *events.PubSubMessage) {
 	// Get the MeshConfig resource
-	prevMeshConfig, okPrevCast := psubMsg.OldObj.(*v1alpha1.MeshConfig)
-	newMeshConfig, okNewCast := psubMsg.NewObj.(*v1alpha1.MeshConfig)
+	prevMeshConfig, okPrevCast := psubMsg.OldObj.(*v1alpha2.MeshConfig)
+	newMeshConfig, okNewCast := psubMsg.NewObj.(*v1alpha2.MeshConfig)
 	if !okPrevCast || !okNewCast {
 		log.Error().Msgf("[%s] Error casting old/new MeshConfigs objects (%v %v)",
 			psubMsg.AnnouncementType, okPrevCast, okNewCast)
@@ -188,20 +188,20 @@ func (c *Client) getMeshConfigCacheKey() string {
 }
 
 // Returns the current MeshConfig
-func (c *Client) getMeshConfig() *v1alpha1.MeshConfig {
+func (c *Client) getMeshConfig() *v1alpha2.MeshConfig {
 	meshConfigCacheKey := c.getMeshConfigCacheKey()
 	item, exists, err := c.cache.GetByKey(meshConfigCacheKey)
 	if err != nil {
 		log.Error().Err(err).Msgf("Error getting MeshConfig from cache with key %s", meshConfigCacheKey)
-		return &v1alpha1.MeshConfig{}
+		return &v1alpha2.MeshConfig{}
 	}
 
-	var meshConfig *v1alpha1.MeshConfig
+	var meshConfig *v1alpha2.MeshConfig
 	if !exists {
 		log.Warn().Msgf("MeshConfig %s does not exist. Default config values will be used.", meshConfigCacheKey)
-		meshConfig = &v1alpha1.MeshConfig{}
+		meshConfig = &v1alpha2.MeshConfig{}
 	} else {
-		meshConfig = item.(*v1alpha1.MeshConfig)
+		meshConfig = item.(*v1alpha2.MeshConfig)
 	}
 
 	return meshConfig
