@@ -255,7 +255,7 @@ OpenServiceMesh:
     # -- Enable kubernetes validating webhook
     enableValidatingWebhook: false
     # -- If specified, a conversion webhook for OSM's CRD's will be enabled
-    enableCRDConverter: false
+    enableCRDConverter: true
 
 
   # -- Run OSM with PodSecurityPolicy configured

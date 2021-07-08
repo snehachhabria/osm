@@ -7,7 +7,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha1"
+	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha2"
 	"github.com/openservicemesh/osm/pkg/auth"
 	"github.com/openservicemesh/osm/pkg/constants"
 	"github.com/openservicemesh/osm/pkg/errcode"
@@ -25,7 +25,7 @@ func (c *Client) GetOSMNamespace() string {
 	return c.osmNamespace
 }
 
-func marshalConfigToJSON(config *v1alpha1.MeshConfigSpec) (string, error) {
+func marshalConfigToJSON(config *v1alpha2.MeshConfigSpec) (string, error) {
 	bytes, err := json.MarshalIndent(config, "", "    ")
 	if err != nil {
 		return "", err
@@ -206,7 +206,7 @@ func (c *Client) GetClusterDomain() string {
 }
 
 // GetFeatureFlags returns OSM's feature flags
-func (c *Client) GetFeatureFlags() v1alpha1.FeatureFlags {
+func (c *Client) GetFeatureFlags() v1alpha2.FeatureFlags {
 	return c.getMeshConfig().Spec.FeatureFlags
 }
 

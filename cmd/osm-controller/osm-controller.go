@@ -157,7 +157,7 @@ func main() {
 		log.Error().Err(err).Str(errcode.Kind, errcode.ErrParsingMeshConfig.String()).
 			Msgf("Error parsing MeshConfig %s", osmMeshConfigName)
 	}
-	log.Info().Msgf("Initial MeshConfig %s: %s", osmMeshConfigName, meshConfig)
+	log.Info().Msgf("TEST Initial MeshConfig %s: %s", osmMeshConfigName, meshConfig)
 
 	// Start Global log level handler, reads from configurator (meshconfig)
 	StartGlobalLogLevelHandler(cfg, stop)
@@ -195,6 +195,9 @@ func main() {
 			events.GenericEventRecorder().FatalEvent(err, events.InitializationError, "Error creating Kubernetes config client")
 		}
 	}
+
+	log.Info().Msgf("TEST FeatureFlags %v", cfg.GetFeatureFlags())
+	log.Info().Msgf("TEST EnableTestMode %v", cfg.GetFeatureFlags().EnableTestMode)
 
 	// A nil configClient is passed in if multi cluster mode is not enabled.
 	kubeProvider := kube.NewClient(kubernetesClient, configClient, constants.KubeProviderName, cfg)

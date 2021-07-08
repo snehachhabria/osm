@@ -49,44 +49,6 @@ exit_error() {
 # Check if Docker daemon is running
 docker info > /dev/null || { echo "Docker daemon is not running"; exit 1; }
 
-make build-osm
-
-# cleanup stale resources from previous runs
-./demo/clean-kubernetes.sh
-
-# The demo uses osm's namespace as defined by environment variables, K8S_NAMESPACE
-# to house the control plane components.
-#
-# Note: `osm install` creates the namespace via Helm only if such a namespace already
-# doesn't exist. We explicitly create the namespace below because of the need to
-# create container registry credentials in this namespace for the purpose of testing.
-# The side effect of creating the namespace here instead of letting Helm create it is
-# that Helm no longer manages namespace creation, and as a result labels that it
-# otherwise adds for using as a namespace selector are no longer available.
-kubectl create namespace "$K8S_NAMESPACE"
-# Mimic Helm namespace label behavior: https://github.com/helm/helm/blob/release-3.2/pkg/action/install.go#L292
-kubectl label namespace "$K8S_NAMESPACE" name="$K8S_NAMESPACE"
-
-echo "Certificate Manager in use: $CERT_MANAGER"
-if [ "$CERT_MANAGER" = "vault" ]; then
-    echo "Installing Hashi Vault"
-    ./demo/deploy-vault.sh
-fi
-
-if [ "$CERT_MANAGER" = "cert-manager" ]; then
-    echo "Installing cert-manager"
-    ./demo/deploy-cert-manager.sh
-fi
-
-if [ "$DEPLOY_ON_OPENSHIFT" = true ] ; then
-    optionalInstallArgs+=" --set=OpenServiceMesh.enablePrivilegedInitContainer=true"
-fi
-
-make docker-push
-./scripts/create-container-registry-creds.sh "$K8S_NAMESPACE"
-
-# Deploys Xds and Prometheus
-echo "Certificate Manager in use: $CERT_MANAGER"
 if [ "$CERT_MANAGER" = "vault" ]; then
   # shellcheck disable=SC2086
   bin/osm install \

@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha1"
+	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha2"
 	testclient "github.com/openservicemesh/osm/pkg/gen/client/config/clientset/versioned/fake"
 
 	"github.com/openservicemesh/osm/pkg/announcements"
@@ -34,21 +34,21 @@ func TestCreateUpdateConfig(t *testing.T) {
 
 		stop := make(chan struct{})
 		cfg := newConfigurator(meshConfigClientSet, stop, osmNamespace, osmMeshConfigName)
-		tassert.Equal(t, &v1alpha1.MeshConfig{}, cfg.getMeshConfig())
+		tassert.Equal(t, &v1alpha2.MeshConfig{}, cfg.getMeshConfig())
 	})
 
 	tests := []struct {
 		name                  string
-		initialMeshConfigData *v1alpha1.MeshConfigSpec
+		initialMeshConfigData *v1alpha2.MeshConfigSpec
 		checkCreate           func(*tassert.Assertions, Configurator)
-		updatedMeshConfigData *v1alpha1.MeshConfigSpec
+		updatedMeshConfigData *v1alpha2.MeshConfigSpec
 		checkUpdate           func(*tassert.Assertions, Configurator)
 	}{
 		{
 			name: "default",
 
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					EnablePrivilegedInitContainer: true,
 					LogLevel:                      "error",
 					MaxDataPlaneConnections:       0,
@@ -56,25 +56,25 @@ func TestCreateUpdateConfig(t *testing.T) {
 					EnvoyImage:                    "envoyproxy/envoy-alpine:v0.0.0",
 					InitContainerImage:            "openservicemesh/init:v0.0.0",
 				},
-				Traffic: v1alpha1.TrafficSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					EnablePermissiveTrafficPolicyMode: false,
 					EnableEgress:                      true,
 					UseHTTPSIngress:                   true,
 				},
-				Observability: v1alpha1.ObservabilitySpec{
+				Observability: v1alpha2.ObservabilitySpec{
 					OSMLogLevel:       constants.DefaultOSMLogLevel,
 					EnableDebugServer: true,
-					Tracing: v1alpha1.TracingSpec{
+					Tracing: v1alpha2.TracingSpec{
 						Enable: true,
 					},
 				},
-				Certificate: v1alpha1.CertificateSpec{
+				Certificate: v1alpha2.CertificateSpec{
 					ServiceCertValidityDuration: "24h",
 				},
 			},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
-				expectedConfig := &v1alpha1.MeshConfigSpec{
-					Sidecar: v1alpha1.SidecarSpec{
+				expectedConfig := &v1alpha2.MeshConfigSpec{
+					Sidecar: v1alpha2.SidecarSpec{
 						EnablePrivilegedInitContainer: true,
 						LogLevel:                      "error",
 						MaxDataPlaneConnections:       0,
@@ -82,19 +82,19 @@ func TestCreateUpdateConfig(t *testing.T) {
 						EnvoyImage:                    "envoyproxy/envoy-alpine:v0.0.0",
 						InitContainerImage:            "openservicemesh/init:v0.0.0",
 					},
-					Traffic: v1alpha1.TrafficSpec{
+					Traffic: v1alpha2.TrafficSpec{
 						EnablePermissiveTrafficPolicyMode: false,
 						EnableEgress:                      true,
 						UseHTTPSIngress:                   true,
 					},
-					Observability: v1alpha1.ObservabilitySpec{
+					Observability: v1alpha2.ObservabilitySpec{
 						OSMLogLevel:       constants.DefaultOSMLogLevel,
 						EnableDebugServer: true,
-						Tracing: v1alpha1.TracingSpec{
+						Tracing: v1alpha2.TracingSpec{
 							Enable: true,
 						},
 					},
-					Certificate: v1alpha1.CertificateSpec{
+					Certificate: v1alpha2.CertificateSpec{
 						ServiceCertValidityDuration: "24h",
 					},
 				}
@@ -108,16 +108,16 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name: "IsPermissiveTrafficPolicyMode",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Traffic: v1alpha1.TrafficSpec{
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					EnablePermissiveTrafficPolicyMode: true,
 				},
 			},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.True(cfg.IsPermissiveTrafficPolicyMode())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Traffic: v1alpha1.TrafficSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					EnablePermissiveTrafficPolicyMode: false,
 				},
 			},
@@ -127,16 +127,16 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name: "IsEgressEnabled",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Traffic: v1alpha1.TrafficSpec{
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					EnableEgress: true,
 				},
 			},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.True(cfg.IsEgressEnabled())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Traffic: v1alpha1.TrafficSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					EnableEgress: false,
 				},
 			},
@@ -146,16 +146,16 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name: "IsDebugServerEnabled",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Observability: v1alpha1.ObservabilitySpec{
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Observability: v1alpha2.ObservabilitySpec{
 					EnableDebugServer: true,
 				},
 			},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.True(cfg.IsDebugServerEnabled())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Observability: v1alpha1.ObservabilitySpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Observability: v1alpha2.ObservabilitySpec{
 					EnableDebugServer: false,
 				},
 			},
@@ -165,9 +165,9 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name: "IsTracingEnabled",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Observability: v1alpha1.ObservabilitySpec{
-					Tracing: v1alpha1.TracingSpec{
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Observability: v1alpha2.ObservabilitySpec{
+					Tracing: v1alpha2.TracingSpec{
 						Enable:   true,
 						Address:  "myjaeger",
 						Port:     12121,
@@ -181,9 +181,9 @@ func TestCreateUpdateConfig(t *testing.T) {
 				assert.Equal(uint32(12121), cfg.GetTracingPort())
 				assert.Equal("/my/endpoint", cfg.GetTracingEndpoint())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Observability: v1alpha1.ObservabilitySpec{
-					Tracing: v1alpha1.TracingSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Observability: v1alpha2.ObservabilitySpec{
+					Tracing: v1alpha2.TracingSpec{
 						Enable:   false,
 						Address:  "myjaeger",
 						Port:     12121,
@@ -197,16 +197,16 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name: "UseHTTPSIngress",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Traffic: v1alpha1.TrafficSpec{
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					UseHTTPSIngress: true,
 				},
 			},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.True(cfg.UseHTTPSIngress())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Traffic: v1alpha1.TrafficSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					UseHTTPSIngress: false,
 				},
 			},
@@ -216,12 +216,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "GetEnvoyLogLevel",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal("error", cfg.GetEnvoyLogLevel())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					LogLevel: "info",
 				},
 			},
@@ -231,12 +231,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "GetEnvoyImage",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal("envoyproxy/envoy-alpine:v1.18.3", cfg.GetEnvoyImage())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					EnvoyImage: "envoyproxy/envoy-alpine:v1.17.1",
 				},
 			},
@@ -246,12 +246,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "GetInitContainerImage",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal("openservicemesh/init:v0.9.1", cfg.GetInitContainerImage())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					InitContainerImage: "openservicemesh/init:v0.8.2",
 				},
 			},
@@ -261,16 +261,16 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name: "GetServiceCertValidityDuration",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Certificate: v1alpha1.CertificateSpec{
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Certificate: v1alpha2.CertificateSpec{
 					ServiceCertValidityDuration: "24h",
 				},
 			},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal(24*time.Hour, cfg.GetServiceCertValidityPeriod())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Certificate: v1alpha1.CertificateSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Certificate: v1alpha2.CertificateSpec{
 					ServiceCertValidityDuration: "1h",
 				},
 			},
@@ -280,12 +280,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "GetOutboundIPRangeExclusionList",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Nil(cfg.GetOutboundIPRangeExclusionList())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Traffic: v1alpha1.TrafficSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					OutboundIPRangeExclusionList: []string{"1.1.1.1/32", "2.2.2.2/24"},
 				},
 			},
@@ -295,12 +295,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "GetOutboundPortExclusionList",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Nil(cfg.GetOutboundPortExclusionList())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Traffic: v1alpha1.TrafficSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					OutboundPortExclusionList: []int{7070, 6080},
 				},
 			},
@@ -310,12 +310,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "GetIboundPortExclusionList",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Nil(cfg.GetInboundPortExclusionList())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Traffic: v1alpha1.TrafficSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Traffic: v1alpha2.TrafficSpec{
 					InboundPortExclusionList: []int{7070, 6080},
 				},
 			},
@@ -325,16 +325,16 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name: "IsPrivilegedInitContainer",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					EnablePrivilegedInitContainer: true,
 				},
 			},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.True(cfg.IsPrivilegedInitContainer())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					EnablePrivilegedInitContainer: false,
 				},
 			},
@@ -344,13 +344,13 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "GetResyncInterval",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				interval := cfg.GetConfigResyncInterval()
 				assert.Equal(interval, time.Duration(0))
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					ConfigResyncInterval: "2m",
 				},
 			},
@@ -361,13 +361,13 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "NegativeGetResyncInterval",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				interval := cfg.GetConfigResyncInterval()
 				assert.Equal(interval, time.Duration(0))
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					ConfigResyncInterval: "Non-duration string",
 				},
 			},
@@ -378,12 +378,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "GetMaxDataplaneConnections",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal(0, cfg.GetMaxDataPlaneConnections())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					MaxDataPlaneConnections: 1000,
 				},
 			},
@@ -393,14 +393,14 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "GetProxyResources",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				res := cfg.GetProxyResources()
 				assert.Equal(0, len(res.Limits))
 				assert.Equal(0, len(res.Requests))
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Sidecar: v1alpha1.SidecarSpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Sidecar: v1alpha2.SidecarSpec{
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceCPU:    resource.MustParse("1"),
@@ -423,12 +423,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "IsWASMStatsEnabled",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal(false, cfg.GetFeatureFlags().EnableWASMStats)
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				FeatureFlags: v1alpha1.FeatureFlags{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				FeatureFlags: v1alpha2.FeatureFlags{
 					EnableWASMStats: true,
 				},
 			},
@@ -438,12 +438,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "IsEgressPolicyEnabled",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal(false, cfg.GetFeatureFlags().EnableEgressPolicy)
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				FeatureFlags: v1alpha1.FeatureFlags{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				FeatureFlags: v1alpha2.FeatureFlags{
 					EnableEgressPolicy: true,
 				},
 			},
@@ -453,12 +453,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "IsMulticlusterModeEnabled",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal(false, cfg.GetFeatureFlags().EnableMulticlusterMode)
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				FeatureFlags: v1alpha1.FeatureFlags{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				FeatureFlags: v1alpha2.FeatureFlags{
 					EnableMulticlusterMode: true,
 				},
 			},
@@ -468,12 +468,12 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name:                  "IsAsyncProxyServiceMappingEnabled",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{},
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal(false, cfg.GetFeatureFlags().EnableAsyncProxyServiceMapping)
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				FeatureFlags: v1alpha1.FeatureFlags{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				FeatureFlags: v1alpha2.FeatureFlags{
 					EnableAsyncProxyServiceMapping: true,
 				},
 			},
@@ -483,16 +483,16 @@ func TestCreateUpdateConfig(t *testing.T) {
 		},
 		{
 			name: "OSMLogLevel",
-			initialMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Observability: v1alpha1.ObservabilitySpec{
+			initialMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Observability: v1alpha2.ObservabilitySpec{
 					OSMLogLevel: constants.DefaultOSMLogLevel,
 				},
 			},
 			checkCreate: func(assert *tassert.Assertions, cfg Configurator) {
 				assert.Equal(constants.DefaultOSMLogLevel, cfg.GetOSMLogLevel())
 			},
-			updatedMeshConfigData: &v1alpha1.MeshConfigSpec{
-				Observability: v1alpha1.ObservabilitySpec{
+			updatedMeshConfigData: &v1alpha2.MeshConfigSpec{
+				Observability: v1alpha2.ObservabilitySpec{
 					OSMLogLevel: "warn",
 				},
 			},
@@ -518,7 +518,7 @@ func TestCreateUpdateConfig(t *testing.T) {
 			defer close(stop)
 			cfg := NewConfigurator(meshConfigClientSet, stop, osmNamespace, osmMeshConfigName)
 
-			meshConfig := v1alpha1.MeshConfig{
+			meshConfig := v1alpha2.MeshConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: osmNamespace,
 					Name:      osmMeshConfigName,
@@ -526,7 +526,7 @@ func TestCreateUpdateConfig(t *testing.T) {
 				Spec: *test.initialMeshConfigData,
 			}
 
-			_, err := meshConfigClientSet.ConfigV1alpha1().MeshConfigs(osmNamespace).Create(context.TODO(), &meshConfig, metav1.CreateOptions{})
+			_, err := meshConfigClientSet.ConfigV1alpha2().MeshConfigs(osmNamespace).Create(context.TODO(), &meshConfig, metav1.CreateOptions{})
 			assert.Nil(err)
 			log.Info().Msg("Waiting for create announcement")
 			<-confChannel
@@ -538,7 +538,7 @@ func TestCreateUpdateConfig(t *testing.T) {
 			}
 
 			meshConfig.Spec = *test.updatedMeshConfigData
-			_, err = meshConfigClientSet.ConfigV1alpha1().MeshConfigs(osmNamespace).Update(context.TODO(), &meshConfig, metav1.UpdateOptions{})
+			_, err = meshConfigClientSet.ConfigV1alpha2().MeshConfigs(osmNamespace).Update(context.TODO(), &meshConfig, metav1.UpdateOptions{})
 			assert.Nil(err)
 
 			// Wait for the config map change to propagate to the cache.

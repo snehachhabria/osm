@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -75,11 +76,20 @@ func (crdWh *crdConversionWebhook) run(stop <-chan struct{}) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(webhookHealthPath, healthHandler)
+	//mux.HandleFunc(webhookHealthPath, healthHandler)
 
-	// TODO (snchh): add handler and logic for conversion stratergy of each CRD in OSM
+	mux.HandleFunc("/meshconfigconversion", serveMeshConfigConversion)
+	mux.HandleFunc("/trafficaccessconversion", serveTrafficAccessConversion)
+	mux.HandleFunc("/httproutegroupconversion", serveHTTPRouteGroupConversion)
+	mux.HandleFunc("/multiclusterserviceconversion", serveMultiClusterServiceConversion)
+	mux.HandleFunc("/egresspolicyconversion", serveEgressPolicyConversion)
+	mux.HandleFunc("/trafficsplitconversion", serveTrafficSplitConversion)
+	mux.HandleFunc("/tcproutesconversion", serveTCPRouteConversion)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", crdWh.config.ListenPort),
@@ -104,8 +114,27 @@ func (crdWh *crdConversionWebhook) run(stop <-chan struct{}) {
 			log.Error().Err(err).Msg("crd-converter webhook HTTP server failed to start")
 			return
 		}
+		wg.Done()
 	}()
 
+	mux2 := http.NewServeMux()
+
+	mux2.HandleFunc(webhookHealthPath, healthHandler)
+
+	server2 := &http.Server{
+		Addr:    fmt.Sprintf(":%d", 9095),
+		Handler: mux2,
+	}
+
+	go func() {
+		if err := server2.ListenAndServe(); err != nil {
+			log.Error().Err(err).Msg("crd-converter health server failed to start")
+			return
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
 	// Wait on exit signals
 	<-stop
 
