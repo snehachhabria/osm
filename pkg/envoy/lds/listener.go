@@ -22,6 +22,7 @@ const (
 	inboundListenerName           = "inbound-listener"
 	outboundListenerName          = "outbound-listener"
 	multiclusterListenerName      = "multicluster-listener"
+	dnsListenerName               = "dns-listener"
 	prometheusListenerName        = "inbound-prometheus-listener"
 	outboundEgressFilterChainName = "outbound-egress-filter-chain"
 	egressTCPProxyStatPrefix      = "egress-tcp-proxy"
