@@ -17,7 +17,7 @@ fi
 TIMEOUT="600s"
 
 # shellcheck disable=SC1091
-#source .env
+source .env
 
 # Set meaningful defaults for env vars we expect from .env
 MESH_NAME="${MESH_NAME:-osm}"
