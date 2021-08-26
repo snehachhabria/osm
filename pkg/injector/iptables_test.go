@@ -3,6 +3,9 @@ package injector
 import (
 	"testing"
 
+	"github.com/golang/mock/gomock"
+	"github.com/openservicemesh/osm/pkg/apis/config/v1alpha1"
+	"github.com/openservicemesh/osm/pkg/configurator"
 	tassert "github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +16,12 @@ func TestGenerateIptablesCommands(t *testing.T) {
 	outboundPortExclusion := []int{10, 20}
 	inboundPortExclusion := []int{30, 40}
 
-	actual := generateIptablesCommands(outboundIPRangeExclusion, outboundPortExclusion, inboundPortExclusion)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockConfigurator := configurator.NewMockConfigurator(mockCtrl)
+	mockConfigurator.EXPECT().GetFeatureFlags().Return(v1alpha1.FeatureFlags{EnableMulticlusterMode: false}).AnyTimes()
+	actual := generateIptablesCommands(mockConfigurator, outboundIPRangeExclusion, outboundPortExclusion, inboundPortExclusion)
 
 	expected := []string{
 		"iptables -t nat -N PROXY_INBOUND",

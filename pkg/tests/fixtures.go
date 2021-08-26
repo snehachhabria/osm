@@ -96,8 +96,14 @@ const (
 	// ServicePort is the port used by a service
 	ServicePort = 8888
 
+	// GatewayPort is the port used by a service
+	GatewayPort = 6666
+
 	// ServiceIP is the IP used by a service
 	ServiceIP = "8.8.8.8"
+
+	// ServiceIP is the IP used by a gateway
+	GatewayIP = "8.8.8.1"
 
 	// HTTPUserAgent is the User Agent in the HTTP header
 	HTTPUserAgent = "test-UA"
@@ -304,6 +310,12 @@ var (
 	Endpoint = endpoint.Endpoint{
 		IP:   net.ParseIP(ServiceIP),
 		Port: endpoint.Port(ServicePort),
+	}
+
+	// GatewayEndpoint is an endpoint object.
+	GatewayEndpoint = endpoint.Endpoint{
+		IP:   net.ParseIP(GatewayIP),
+		Port: endpoint.Port(GatewayPort),
 	}
 
 	// TrafficSplit is a traffic split SMI object.

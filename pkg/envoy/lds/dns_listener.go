@@ -1,13 +1,18 @@
 package lds
 
 import (
+	"sort"
+	"strings"
 	"time"
 
+	mapset "github.com/deckarep/golang-set"
 	xds_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	xds_listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	dnstable "github.com/envoyproxy/go-control-plane/envoy/data/dns/v3"
 	dnsfilter "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/udp/dns_filter/v3alpha"
+	stringmatcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	"github.com/golang/protobuf/ptypes"
+	"github.com/pkg/errors"
 
 	"github.com/openservicemesh/osm/pkg/constants"
 	"github.com/openservicemesh/osm/pkg/envoy"
@@ -16,28 +21,66 @@ import (
 
 const resolverTimeout = 10 * time.Second
 
-func newDNSListener() (*xds_listener.Listener, error) {
+var knownSuffixes = []*stringmatcher.StringMatcher{
+	{
+		MatchPattern: &stringmatcher.StringMatcher_SafeRegex{
+			SafeRegex: &stringmatcher.RegexMatcher{
+				EngineType: &stringmatcher.RegexMatcher_GoogleRe2{GoogleRe2: &stringmatcher.RegexMatcher_GoogleRE2{}},
+				Regex:      ".*", // Match everything.. All DNS queries go through Envoy. Unknown ones will be forwarded
+			},
+		},
+	},
+}
+
+func (lb *listenerBuilder) newDNSListener() (*xds_listener.Listener, error) {
 	address := envoy.GetAddress(constants.WildcardIPAddr, constants.EnvoyDNSListenerPort)
 	// Convert the address to a UDP address
 	address.GetSocketAddress().Protocol = xds_core.SocketAddress_UDP
 
-	inlineDNSTable := buildInlineDNSTable(node, push)
+	inlineDNSTable, err := lb.getInlineDNSTable()
+
+	/*if len(inlineDNSTable.VirtualDomains) == 0 || err != nil {
+		// No virtual domains or an error computing virtual domains
+		return nil, nil
+	}*/
+
+	if err != nil {
+		return nil, nil
+	}
 
 	dnsFilterConfig := &dnsfilter.DnsFilterConfig{
 		StatPrefix: "dns",
-		ServerConfig: &dnsfilter.DnsFilterConfig_ServerContextConfig{
+		/*ServerConfig: &dnsfilter.DnsFilterConfig_ServerContextConfig{
 			ConfigSource: &dnsfilter.DnsFilterConfig_ServerContextConfig_InlineDnsTable{InlineDnsTable: inlineDNSTable},
-		},
+		},*/
 		ClientConfig: &dnsfilter.DnsFilterConfig_ClientContextConfig{
 			ResolverTimeout: ptypes.DurationProto(resolverTimeout),
-			// no upstream resolves. Envoy will use the ambient ones
-			MaxPendingLookups: 256, // arbitrary
+			// We configure upstream resolver to resolver that always returns that it could not find the domain (NXDOMAIN)
+			// As for this moment there is no setting to disable upstream resolving.
+			UpstreamResolvers: []*xds_core.Address{{Address: &xds_core.Address_SocketAddress{
+				SocketAddress: &xds_core.SocketAddress{
+					//Protocol: xds_core.SocketAddress_UDP,
+					Address: "10.0.0.10",
+					PortSpecifier: &xds_core.SocketAddress_PortValue{
+						PortValue: 53,
+					},
+				},
+			}}},
+			MaxPendingLookups: 256,
 		},
 	}
+
+	if len(inlineDNSTable.VirtualDomains) != 0 {
+		dnsFilterConfig.ServerConfig =
+			&dnsfilter.DnsFilterConfig_ServerContextConfig{
+				ConfigSource: &dnsfilter.DnsFilterConfig_ServerContextConfig_InlineDnsTable{InlineDnsTable: inlineDNSTable},
+			}
+	}
+
 	dnsFilterConfigMarshal, err := ptypes.MarshalAny(dnsFilterConfig)
 	if err != nil {
 		log.Error().Err(err).Str(errcode.Kind, errcode.GetErrCodeWithMetric(errcode.ErrMarshallingXDSResource)).
-			Msgf("Error marshalling HttpConnectionManager object")
+			Msgf("TEST Error marshalling HttpConnectionManager object")
 		return nil, err
 	}
 
@@ -58,107 +101,131 @@ func newDNSListener() (*xds_listener.Listener, error) {
 	}, nil
 }
 
-func buildInlineDNSTable(node *model.Proxy, push *model.PushContext) *dnstable.DnsTable {
-
+func (lb *listenerBuilder) getInlineDNSTable() (*dnstable.DnsTable, error) {
+	upstreamServices := lb.meshCatalog.ListMeshServicesForIdentity(lb.serviceIdentity)
 	// build a virtual domain for each service visible to this sidecar
 	virtualDomains := make([]*dnstable.DnsTable_DnsVirtualDomain, 0)
+	log.Info().Msgf("TEST build DNS Table for proxy %s with services %v", lb.serviceIdentity, upstreamServices)
 
-	for _, svc := range push.Services(node) {
-		// we cannot take services with wildcards in the address field. The reason
-		// is that even if we provide some dummy IP (subject to enabling this
-		// feature in Envoy), after capturing the traffic from the app, the
-		// sidecar would need to forward to the real IP. But to determine the real
-		// IP, the sidecar would have to know the non-wildcard FQDN that the
-		// application was trying to resolve. This information is not available
-		// for TCP services. The wildcard hostname is not a problem for HTTP
-		// services though, as we usually setup a listener on 0.0.0.0, process
-		// based on http virtual host and forward to the orig destination IP.
-		//
-		// Long story short, if the user has a TCP service of the form
-		//
-		// host: *.mysql.aws.com, port 3306,
-		//
-		// our only recourse is to allocate a 0.0.0.0:3306 passthrough listener and forward to
-		// original dest IP. It is now the user's responsibility to not allocate
-		// another wildcard service on the same port. i.e.
-		//
-		// 1. host: *.mysql.aws.com, port 3306
-		// 2. host: *.mongo.aws.com, port 3306 will result in conflict.
-		//
-		// Traffic will still flow but metrics wont be correct
-		// as two different TCP services are consuming the
-		// same wildcard passthrough TCP listener 0.0.0.0:3306.
-		//
-		if svc.Hostname.IsWildCarded() {
+	if len(upstreamServices) == 0 {
+		log.Debug().Msgf("Proxy with identity %s does not have any allowed upstream services", lb.serviceIdentity)
+		return &dnstable.DnsTable{
+			VirtualDomains: virtualDomains,
+			KnownSuffixes:  knownSuffixes,
+		}, nil
+	}
+
+	for _, upstreamSvc := range upstreamServices {
+		log.Trace().Msgf("TEST Building dns filter chain for upstream service %s for proxy with identity %s", upstreamSvc, lb.serviceIdentity)
+		protocolToPortMap, err := lb.meshCatalog.GetPortToProtocolMappingForService(upstreamSvc)
+		if err != nil {
+			log.Error().Err(err).Str(errcode.Kind, errcode.GetErrCodeWithMetric(errcode.ErrGettingServicePorts)).
+				Msgf("Error retrieving port to protocol mapping for upstream service %s", upstreamSvc)
 			continue
 		}
 
-		svcAddress := svc.GetServiceAddressForProxy(node)
-		var addressList []string
-
-		// The IP will be unspecified here if its headless service or if the auto
-		// IP allocation logic for service entry was unable to allocate an IP.
-		if svcAddress == constants.UnspecifiedIP {
-			// For all k8s headless services, populate the dns table with the endpoint IPs as k8s does.
-			// TODO: Need to have an entry per pod hostname of stateful set but for this, we need to parse
-			// the stateful set object, associate the object with the appropriate kubernetes headless service
-			// and then derive the stable network identities.
-			if svc.Attributes.ServiceRegistry == string(serviceregistry.Kubernetes) &&
-				svc.Resolution == model.Passthrough && len(svc.Ports) > 0 {
-				// TODO: this is used in two places now. Needs to be cached as part of the headless service
-				// object to avoid the costly lookup in the registry code
-				if instances, err := push.InstancesByPort(svc, svc.Ports[0].Port, nil); err == nil {
-					for _, instance := range instances {
-						// TODO: should we skip the node's own IP like we do in listener?
-						addressList = append(addressList, instance.Endpoint.Address)
-					}
+		for port, appProtocol := range protocolToPortMap {
+			switch strings.ToLower(appProtocol) {
+			case constants.ProtocolHTTP, constants.ProtocolGRPC:
+				endpoints, err := lb.meshCatalog.GetResolvableServiceEndpoints(upstreamSvc)
+				if err != nil {
+					log.Error().Err(err).Str(errcode.Kind, errcode.GetErrCodeWithMetric(errcode.ErrGettingResolvableServiceEndpoints)).
+						Msgf("Error getting GetResolvableServiceEndpoints for %q", upstreamSvc)
+					return &dnstable.DnsTable{}, err
 				}
-			}
 
-			if len(addressList) == 0 {
-				// could not reliably determine the addresses of endpoints of headless service
-				// or this is not a k8s service
-				continue
-			}
-		} else {
-			addressList = append(addressList, svcAddress)
-		}
+				if len(endpoints) == 0 {
+					err := errors.Errorf("Endpoints not found for service %q", upstreamSvc)
+					log.Error().Err(err).Str(errcode.Kind, errcode.GetErrCodeWithMetric(errcode.ErrEndpointsNotFound)).
+						Msgf("Error constructing HTTP filter chain match for service %q", upstreamSvc)
+					return nil, err
+				}
 
-		virtualDomains = append(virtualDomains, &dnstable.DnsTable_DnsVirtualDomain{
-			Name: string(svc.Hostname),
-			Endpoint: &dnstable.DnsTable_DnsEndpoint{
-				EndpointConfig: &dnstable.DnsTable_DnsEndpoint_AddressList{
-					AddressList: &dnstable.DnsTable_AddressList{Address: addressList},
-				},
-			},
-		})
+				endpointSet := mapset.NewSet()
+				for _, endp := range endpoints {
+					endpointSet.Add(endp.IP.String())
+				}
 
-		// If this is a kubernetes service, generate short form names (name.namespace) and
-		// just name (if proxy is in same namespace).
-		if svc.Attributes.ServiceRegistry == string(serviceregistry.Kubernetes) {
-			virtualDomains = append(virtualDomains, &dnstable.DnsTable_DnsVirtualDomain{
-				Name: svc.Attributes.Name + "." + svc.Attributes.Namespace,
-				Endpoint: &dnstable.DnsTable_DnsEndpoint{
-					EndpointConfig: &dnstable.DnsTable_DnsEndpoint_AddressList{
-						AddressList: &dnstable.DnsTable_AddressList{Address: addressList},
-					},
-				},
-			})
-			if node.ConfigNamespace == svc.Attributes.Namespace {
-				virtualDomains = append(virtualDomains, &dnstable.DnsTable_DnsVirtualDomain{
-					Name: svc.Attributes.Name,
+				// For deterministic ordering
+				var sortedEndpoints []string
+				endpointSet.Each(func(elem interface{}) bool {
+					sortedEndpoints = append(sortedEndpoints, elem.(string))
+					return false
+				})
+				sort.Strings(sortedEndpoints)
+
+				/*virtualDomains = append(virtualDomains, &dnstable.DnsTable_DnsVirtualDomain{
+					Name: upstreamSvc.Name + "." + upstreamSvc.Namespace + ".svc.cluster.local",
 					Endpoint: &dnstable.DnsTable_DnsEndpoint{
 						EndpointConfig: &dnstable.DnsTable_DnsEndpoint_AddressList{
-							AddressList: &dnstable.DnsTable_AddressList{Address: addressList},
+							AddressList: &dnstable.DnsTable_AddressList{Address: sortedEndpoints},
+						},
+					},
+				})*/
+
+				// Add endpoints to gateway's in other clusters
+				endpoints, err = lb.meshCatalog.GetMulticlusterGatewayEndpoints(upstreamSvc)
+				if err != nil {
+					log.Error().Err(err).Str(errcode.Kind, errcode.GetErrCodeWithMetric(errcode.ErrGettingMulticlusterGatewayEndpoints)).
+						Msgf("Error getting GetMulticlusterGatewaysEndpoints for %q", upstreamSvc)
+					return &dnstable.DnsTable{}, err
+				}
+
+				if len(endpoints) == 0 {
+					err := errors.Errorf("Multicluster endpoints not found for service %q", upstreamSvc)
+					log.Error().Err(err).Str(errcode.Kind, errcode.GetErrCodeWithMetric(errcode.ErrEndpointsNotFound)).
+						Msgf("Error constructing HTTP filter chain match for service %q", upstreamSvc)
+					return nil, err
+				}
+				//var sortedEndpoints []string
+				endpointSet = mapset.NewSet()
+				for _, endp := range endpoints {
+					endpointSet.Add(endp.IP.String())
+				}
+
+				// For deterministic ordering
+				endpointSet.Each(func(elem interface{}) bool {
+					sortedEndpoints = append(sortedEndpoints, elem.(string))
+					return false
+				})
+				sort.Strings(sortedEndpoints)
+
+				virtualDomains = append(virtualDomains, &dnstable.DnsTable_DnsVirtualDomain{
+					Name: upstreamSvc.Name + "." + "osmmesh",
+					Endpoint: &dnstable.DnsTable_DnsEndpoint{
+						EndpointConfig: &dnstable.DnsTable_DnsEndpoint_AddressList{
+							AddressList: &dnstable.DnsTable_AddressList{Address: sortedEndpoints},
 						},
 					},
 				})
+
+			case constants.ProtocolTCP:
+				continue
+
+			default:
+				log.Error().Msgf("Cannot build address list, unsupported protocol %s for upstream:port %s:%d", appProtocol, upstreamSvc, port)
 			}
 		}
+
 	}
 
-	return &dnstable.DnsTable{
-		VirtualDomains: virtualDomains,
-		KnownSuffixes:  knownSuffixes,
+	sort.Stable(DnsTableByName(virtualDomains)) // for stable Envoy config
+
+	dnsTable := &dnstable.DnsTable{
+		VirtualDomains:     virtualDomains,
+		ExternalRetryCount: 0,
+		KnownSuffixes:      knownSuffixes,
 	}
+
+	log.Info().Msgf("TEST DNS Table for proxy %s is %v", lb.serviceIdentity, dnsTable)
+
+	return dnsTable, nil
+}
+
+type DnsTableByName []*dnstable.DnsTable_DnsVirtualDomain
+
+func (a DnsTableByName) Len() int      { return len(a) }
+func (a DnsTableByName) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a DnsTableByName) Less(i, j int) bool {
+	return a[i].Name < a[j].Name
 }

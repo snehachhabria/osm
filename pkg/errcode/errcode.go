@@ -99,6 +99,9 @@ const (
 	// ErrGettingResolvableServiceEndpoints indicates the resolvable set of endpoints over which the service is accessible using its FQDN cannot be obtained
 	ErrGettingResolvableServiceEndpoints
 
+	// ErrGettingMulticlusterGatewayEndpoints indicates the resolvable set of endpoints over which the service is accessible using the gateway cannot be obtained
+	ErrGettingMulticlusterGatewayEndpoints
+
 	// ErrEndpointsNotFound indicates resolvable service endpoints could not be found
 	ErrEndpointsNotFound
 

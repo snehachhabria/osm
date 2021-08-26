@@ -38,6 +38,24 @@ func (mc *MeshCatalog) GetResolvableServiceEndpoints(svc service.MeshService) ([
 	return endpoints, nil
 }
 
+// GetMulticlusterGatewayEndpoints returns the resolvable set of endpoint for the multicluster gateway
+func (mc *MeshCatalog) GetMulticlusterGatewayEndpoints(svc service.MeshService) ([]endpoint.Endpoint, error) {
+	var endpoints []endpoint.Endpoint
+	for _, provider := range mc.endpointsProviders {
+		ep, err := provider.GetMulticlusterEndpointsForService(svc)
+		if err != nil {
+			log.Error().Err(err).Msgf("[%s] Error getting endpoints for Service %s", provider.GetID(), svc)
+			continue
+		}
+		if len(ep) == 0 {
+			log.Trace().Msgf("[%s] No endpoints found for service=%s", provider.GetID(), svc)
+			continue
+		}
+		endpoints = append(endpoints, ep...)
+	}
+	return endpoints, nil
+}
+
 // ListEndpointsForServiceIdentity returns a list of endpoints that belongs to an upstream service accounts
 // from the given downstream identity's perspective
 // Note: ServiceIdentity must be in the format "name.namespace" [https://github.com/openservicemesh/osm/issues/3188]

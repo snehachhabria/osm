@@ -49,6 +49,21 @@ func (mr *MockProviderMockRecorder) GetID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetID", reflect.TypeOf((*MockProvider)(nil).GetID))
 }
 
+// GetMulticlusterEndpointsForService mocks base method
+func (m *MockProvider) GetMulticlusterEndpointsForService(arg0 service.MeshService) ([]Endpoint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMulticlusterEndpointsForService", arg0)
+	ret0, _ := ret[0].([]Endpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMulticlusterEndpointsForService indicates an expected call of GetMulticlusterEndpointsForService
+func (mr *MockProviderMockRecorder) GetMulticlusterEndpointsForService(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMulticlusterEndpointsForService", reflect.TypeOf((*MockProvider)(nil).GetMulticlusterEndpointsForService), arg0)
+}
+
 // GetResolvableEndpointsForService mocks base method
 func (m *MockProvider) GetResolvableEndpointsForService(arg0 service.MeshService) ([]Endpoint, error) {
 	m.ctrl.T.Helper()

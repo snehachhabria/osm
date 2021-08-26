@@ -29,7 +29,7 @@ const (
 	EnvoyOutboundListenerPort = 15001
 
 	// EnvoyDNSListenerPort is Envoy's DNS listener port number.
-	EnvoyDNSListenerPort = 15004
+	EnvoyDNSListenerPort = 53
 
 	// EnvoyOutboundListenerPortName is Envoy's outbound listener port name.
 	EnvoyOutboundListenerPortName = "proxy-outbound"

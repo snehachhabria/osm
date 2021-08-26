@@ -82,6 +82,21 @@ func (mr *MockMeshCatalogerMockRecorder) GetKubeController() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKubeController", reflect.TypeOf((*MockMeshCataloger)(nil).GetKubeController))
 }
 
+// GetMulticlusterGatewayEndpoints mocks base method
+func (m *MockMeshCataloger) GetMulticlusterGatewayEndpoints(arg0 service.MeshService) ([]endpoint.Endpoint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMulticlusterGatewayEndpoints", arg0)
+	ret0, _ := ret[0].([]endpoint.Endpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMulticlusterGatewayEndpoints indicates an expected call of GetMulticlusterGatewayEndpoints
+func (mr *MockMeshCatalogerMockRecorder) GetMulticlusterGatewayEndpoints(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMulticlusterGatewayEndpoints", reflect.TypeOf((*MockMeshCataloger)(nil).GetMulticlusterGatewayEndpoints), arg0)
+}
+
 // GetPortToProtocolMappingForService mocks base method
 func (m *MockMeshCataloger) GetPortToProtocolMappingForService(arg0 service.MeshService) (map[uint32]string, error) {
 	m.ctrl.T.Helper()

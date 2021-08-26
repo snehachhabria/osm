@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/openservicemesh/osm/pkg/configurator"
 	"github.com/openservicemesh/osm/pkg/constants"
 )
 
@@ -44,6 +45,13 @@ var iptablesOutboundStaticRules = []string{
 	"iptables -t nat -A PROXY_OUTPUT -j PROXY_REDIRECT",
 }
 
+// iptablesDNSStaticRules is the list of iptables rules related to DNS traffic interception and redirection
+var iptablesDNSStaticRules = []string{
+	"iptables -t nat -A OUTPUT -p udp -j PROXY_OUTPUT",
+	fmt.Sprintf("iptables -t nat -A PROXY_OUTPUT -p udp --dport 53 -j REDIRECT --to-port %d", constants.EnvoyDNSListenerPort),
+	//fmt.Sprintf("iptables -t nat -A PROXY_OUTPUT -p udp --dport 53 -m owner --uid-owner %d -j RETURN", constants.EnvoyUID),
+}
+
 // iptablesInboundStaticRules is the list of iptables rules related to inbound traffic interception and redirection
 var iptablesInboundStaticRules = []string{
 	// Redirects inbound TCP traffic hitting the PROXY_IN_REDIRECT chain to Envoy's inbound listener port
@@ -67,7 +75,7 @@ var iptablesInboundStaticRules = []string{
 }
 
 // generateIptablesCommands generates a list of iptables commands to set up sidecar interception and redirection
-func generateIptablesCommands(outboundIPRangeExclusionList []string, outboundPortExclusionList []int, inboundPortExclusionList []int) []string {
+func generateIptablesCommands(cfg configurator.Configurator, outboundIPRangeExclusionList []string, outboundPortExclusionList []int, inboundPortExclusionList []int) []string {
 	var cmd []string
 
 	// 1. Create redirection chains
@@ -79,7 +87,12 @@ func generateIptablesCommands(outboundIPRangeExclusionList []string, outboundPor
 	// 3. Create inbound rules
 	cmd = append(cmd, iptablesInboundStaticRules...)
 
-	// 4. Create dynamic outbound ip ranges exclusion rules
+	// 4. Create dns rules
+	if cfg.GetMeshConfig().Spec.FeatureFlags.EnableMulticlusterMode {
+		cmd = append(cmd, iptablesDNSStaticRules...)
+	}
+
+	// 5. Create dynamic outbound ip ranges exclusion rules
 	for _, cidr := range outboundIPRangeExclusionList {
 		// *Note: it is important to use the insert option '-I' instead of the append option '-A' to ensure the exclusion
 		// rules take precedence over the static redirection rules. Iptables rules are evaluated in order.
@@ -87,7 +100,7 @@ func generateIptablesCommands(outboundIPRangeExclusionList []string, outboundPor
 		cmd = append(cmd, rule)
 	}
 
-	// 5. Create dynamic outbound ports exclusion rules
+	// 6. Create dynamic outbound ports exclusion rules
 	if len(outboundPortExclusionList) > 0 {
 		var portExclusionListStr []string
 		for _, port := range outboundPortExclusionList {
@@ -98,7 +111,7 @@ func generateIptablesCommands(outboundIPRangeExclusionList []string, outboundPor
 		cmd = append(cmd, rule)
 	}
 
-	// 6. Create dynamic inbound ports exclusion rules
+	// 7. Create dynamic inbound ports exclusion rules
 	if len(inboundPortExclusionList) > 0 {
 		var portExclusionListStr []string
 		for _, port := range inboundPortExclusionList {

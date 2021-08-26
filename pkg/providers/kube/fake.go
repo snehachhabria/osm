@@ -26,6 +26,12 @@ func NewFakeProvider() Provider {
 			tests.BookbuyerService.String():     {tests.Endpoint},
 			tests.BookstoreApexService.String(): {tests.Endpoint},
 		},
+		gatewayEndpoints: map[string][]endpoint.Endpoint{
+			tests.BookstoreV1Service.String():   {tests.GatewayEndpoint},
+			tests.BookstoreV2Service.String():   {tests.GatewayEndpoint},
+			tests.BookbuyerService.String():     {tests.GatewayEndpoint},
+			tests.BookstoreApexService.String(): {tests.GatewayEndpoint},
+		},
 		services: map[identity.K8sServiceAccount][]service.MeshService{
 			tests.BookstoreServiceAccount:   {tests.BookstoreV1Service, tests.BookstoreApexService},
 			tests.BookstoreV2ServiceAccount: {tests.BookstoreV2Service},
@@ -41,6 +47,7 @@ func NewFakeProvider() Provider {
 
 type fakeClient struct {
 	endpoints           map[string][]endpoint.Endpoint
+	gatewayEndpoints    map[string][]endpoint.Endpoint
 	services            map[identity.K8sServiceAccount][]service.MeshService
 	svcAccountEndpoints map[identity.K8sServiceAccount][]endpoint.Endpoint
 }
@@ -131,6 +138,14 @@ func (f fakeClient) GetID() string {
 
 func (f fakeClient) GetResolvableEndpointsForService(svc service.MeshService) ([]endpoint.Endpoint, error) {
 	endpoints, found := f.endpoints[svc.String()]
+	if !found {
+		return nil, errServiceNotFound
+	}
+	return endpoints, nil
+}
+
+func (f fakeClient) GetMulticlusterEndpointsForService(svc service.MeshService) ([]endpoint.Endpoint, error) {
+	endpoints, found := f.gatewayEndpoints[svc.String()]
 	if !found {
 		return nil, errServiceNotFound
 	}

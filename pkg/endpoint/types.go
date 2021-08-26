@@ -24,6 +24,9 @@ type Provider interface {
 	// the scope of the provider
 	GetResolvableEndpointsForService(service.MeshService) ([]Endpoint, error)
 
+	// GetMulticlusterEndpointsForService returns the endpoints for multicluster gateway
+	GetMulticlusterEndpointsForService(service.MeshService) ([]Endpoint, error)
+
 	// GetID returns the unique identifier of the EndpointsProvider.
 	GetID() string
 }

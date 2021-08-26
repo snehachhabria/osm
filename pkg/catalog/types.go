@@ -73,6 +73,9 @@ type MeshCataloger interface {
 	// If no LB/virtual IPs are assigned to the service, GetResolvableServiceEndpoints will return ListEndpointsForService
 	GetResolvableServiceEndpoints(service.MeshService) ([]endpoint.Endpoint, error)
 
+	// GetMulticlusterGatewayEndpoints returns the resolvable set of endpoint for the multicluster gateway
+	GetMulticlusterGatewayEndpoints(service.MeshService) ([]endpoint.Endpoint, error)
+
 	// GetIngressTrafficPolicy returns the ingress traffic policy for the given mesh service
 	GetIngressTrafficPolicy(service.MeshService) (*trafficpolicy.IngressTrafficPolicy, error)
 

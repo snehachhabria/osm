@@ -13,13 +13,13 @@ import (
 
 const portIPSeparator = `:`
 
-// getMulticlusterEndpoints returns the endpoints for multicluster services if such exist.
-func (c *client) getMulticlusterEndpoints(svc service.MeshService) []endpoint.Endpoint {
+// GetMulticlusterEndpointsForService returns the endpoints for multicluster services if such exist.
+func (c *client) GetMulticlusterEndpointsForService(svc service.MeshService) ([]endpoint.Endpoint, error) {
 	var endpoints []endpoint.Endpoint
 	serviceIdentities, err := c.kubeController.ListServiceIdentitiesForService(svc)
 	if err != nil {
 		log.Error().Str(constants.LogFieldContext, constants.LogContextMulticluster).Err(err).Msgf("[%s] Error getting Multicluster service identities for service %s", c.providerIdent, svc.Name)
-		return endpoints
+		return endpoints, nil
 	}
 
 	for _, ident := range serviceIdentities {
@@ -28,7 +28,7 @@ func (c *client) getMulticlusterEndpoints(svc service.MeshService) []endpoint.En
 	}
 
 	log.Debug().Str(constants.LogFieldContext, constants.LogContextMulticluster).Msgf("[%s] Multicluster Endpoints for service %s: %+v", c.providerIdent, svc, endpoints)
-	return endpoints
+	return endpoints, nil
 }
 
 // getMultiClusterServiceEndpointsForServiceAccount returns the multicluster services for a service account if such exist.

@@ -67,9 +67,9 @@ func TestHelperFunctions(t *testing.T) {
 
 	c = NewClient(mockKubeController, mockConfigController, "kubernetes-endpoint-provider", mockConfigurator)
 
-	// Test getMulticlusterEndpoints()
+	// Test GetMulticlusterEndpointsForService()
 	// returns Multicluster endpoints for a service
-	actual := c.getMulticlusterEndpoints(tests.BookbuyerService)
+	actual, err := c.GetMulticlusterEndpointsForService(tests.BookbuyerService)
 	assert.Equal(actual, expectedEndpoint)
 
 	// Test getMultiClusterServiceEndpointsForServiceAccount()

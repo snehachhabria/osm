@@ -97,6 +97,23 @@ func NewResponse(meshCatalog catalog.MeshCataloger, proxy *envoy.Proxy, _ *xds_d
 		}
 	}
 
+	// DNS Listener
+	if cfg.GetFeatureFlags().EnableMulticlusterMode {
+		log.Info().Msgf("TEST building DNS listener for proxy %s", proxy.String())
+		dnsListener, err := lb.newDNSListener()
+		if err != nil {
+			log.Error().Err(err).Msgf("TEST Error building dns listener for proxy %s", proxy.String())
+		} else {
+			if dnsListener == nil {
+				// This check is important to prevent attempting to configure a listener without a filter chain which
+				// otherwise results in an error.
+				log.Debug().Msgf("TEST Not programming dns listener for proxy %s", proxy.String())
+			} else {
+				ldsResources = append(ldsResources, dnsListener)
+			}
+		}
+	}
+
 	return ldsResources, nil
 }
 
