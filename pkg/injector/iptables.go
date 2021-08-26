@@ -49,7 +49,7 @@ var iptablesOutboundStaticRules = []string{
 var iptablesDNSStaticRules = []string{
 	"iptables -t nat -A OUTPUT -p udp -j PROXY_OUTPUT",
 	fmt.Sprintf("iptables -t nat -A PROXY_OUTPUT -p udp --dport 53 -j REDIRECT --to-port %d", constants.EnvoyDNSListenerPort),
-	//fmt.Sprintf("iptables -t nat -A PROXY_OUTPUT -p udp --dport 53 -m owner --uid-owner %d -j RETURN", constants.EnvoyUID),
+	fmt.Sprintf("iptables -t nat -A PROXY_OUTPUT -p udp --dport 53 -m owner --uid-owner %d -j RETURN", constants.EnvoyUID),
 }
 
 // iptablesInboundStaticRules is the list of iptables rules related to inbound traffic interception and redirection

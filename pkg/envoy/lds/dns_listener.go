@@ -52,7 +52,7 @@ func (lb *listenerBuilder) newDNSListener() (*xds_listener.Listener, error) {
 		StatPrefix: "dns",
 		/*ServerConfig: &dnsfilter.DnsFilterConfig_ServerContextConfig{
 			ConfigSource: &dnsfilter.DnsFilterConfig_ServerContextConfig_InlineDnsTable{InlineDnsTable: inlineDNSTable},
-		},*/
+		},
 		ClientConfig: &dnsfilter.DnsFilterConfig_ClientContextConfig{
 			ResolverTimeout: ptypes.DurationProto(resolverTimeout),
 			// We configure upstream resolver to resolver that always returns that it could not find the domain (NXDOMAIN)
@@ -67,7 +67,7 @@ func (lb *listenerBuilder) newDNSListener() (*xds_listener.Listener, error) {
 				},
 			}}},
 			MaxPendingLookups: 256,
-		},
+		},*/
 	}
 
 	if len(inlineDNSTable.VirtualDomains) != 0 {
