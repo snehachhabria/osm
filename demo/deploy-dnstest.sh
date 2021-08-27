@@ -1,4 +1,9 @@
-echo -e "Deploy BookBuyer Service Account"
+set -aueo pipefail
+
+# shellcheck disable=SC1091
+source .env
+
+echo -e "Deploy DnsTest Service Account"
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ServiceAccount
@@ -7,7 +12,7 @@ metadata:
   namespace: bookbuyer
 EOF
 
-echo -e "Deploy BookBuyer Deployment"
+echo -e "Deploy DnsTest Deployment"
 kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
