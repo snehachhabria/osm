@@ -27,7 +27,6 @@ import (
 	configClientset "github.com/openservicemesh/osm/pkg/gen/client/config/clientset/versioned"
 	policyClientset "github.com/openservicemesh/osm/pkg/gen/client/policy/clientset/versioned"
 	"github.com/openservicemesh/osm/pkg/messaging"
-	"github.com/openservicemesh/osm/pkg/reconciler"
 
 	"github.com/openservicemesh/osm/pkg/catalog"
 	"github.com/openservicemesh/osm/pkg/certificate/providers"
@@ -61,23 +60,18 @@ const (
 )
 
 var (
-	verbosity                  string
-	meshName                   string // An ID that uniquely identifies an OSM instance
-	osmNamespace               string
-	osmServiceAccount          string
-	validatorWebhookConfigName string
-	caBundleSecretName         string
-	osmMeshConfigName          string
-	osmVersion                 string
+	verbosity          string
+	meshName           string // An ID that uniquely identifies an OSM instance
+	osmNamespace       string
+	osmServiceAccount  string
+	caBundleSecretName string
+	osmMeshConfigName  string
 
 	certProviderKind string
 
 	tresorOptions      providers.TresorOptions
 	vaultOptions       providers.VaultOptions
 	certManagerOptions providers.CertManagerOptions
-
-	enableReconciler      bool
-	validateTrafficTarget bool
 
 	scheme = runtime.NewScheme()
 )
@@ -92,9 +86,8 @@ func init() {
 	flags.StringVar(&meshName, "mesh-name", "", "OSM mesh name")
 	flags.StringVar(&osmNamespace, "osm-namespace", "", "OSM controller's namespace")
 	flags.StringVar(&osmServiceAccount, "osm-service-account", "", "OSM controller's service account")
-	flags.StringVar(&validatorWebhookConfigName, "validator-webhook-config", "", "Name of the ValidatingWebhookConfiguration for the resource validator webhook")
+
 	flags.StringVar(&osmMeshConfigName, "osm-config-name", "osm-mesh-config", "Name of the OSM MeshConfig")
-	flags.StringVar(&osmVersion, "osm-version", "", "Version of OSM")
 
 	// Generic certificate manager/provider options
 	flags.StringVar(&certProviderKind, "certificate-manager", providers.TresorKind.String(), fmt.Sprintf("Certificate manager, one of [%v]", providers.ValidCertificateProviders))
@@ -111,10 +104,6 @@ func init() {
 	flags.StringVar(&certManagerOptions.IssuerName, "cert-manager-issuer-name", "osm-ca", "cert-manager issuer name")
 	flags.StringVar(&certManagerOptions.IssuerKind, "cert-manager-issuer-kind", "Issuer", "cert-manager issuer kind")
 	flags.StringVar(&certManagerOptions.IssuerGroup, "cert-manager-issuer-group", "cert-manager.io", "cert-manager issuer group")
-
-	// Reconciler options
-	flags.BoolVar(&enableReconciler, "enable-reconciler", false, "Enable reconciler for CDRs, mutating webhook and validating webhook")
-	flags.BoolVar(&validateTrafficTarget, "validate-traffic-target", true, "Enable traffic target validation")
 
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = admissionv1.AddToScheme(scheme)
@@ -246,7 +235,7 @@ func main() {
 
 	clientset := extensionsClientset.NewForConfigOrDie(kubeConfig)
 
-	if err := validator.NewValidatingWebhook(validatorWebhookConfigName, osmNamespace, osmVersion, meshName, enableReconciler, validateTrafficTarget, constants.ValidatorWebhookPort, certManager, kubeClient, stop); err != nil {
+	if err := validator.NewValidatingWebhook(osmNamespace, constants.ValidatorWebhookPort, certManager, kubeClient, stop); err != nil {
 		events.GenericEventRecorder().FatalEvent(err, events.InitializationError, "Error starting the validating webhook server")
 	}
 
@@ -280,14 +269,6 @@ func main() {
 	go k8s.WatchAndUpdateProxyBootstrapSecret(kubeClient, msgBroker, stop)
 	// Start the global log level watcher that updates the log level dynamically
 	go k8s.WatchAndUpdateLogLevel(msgBroker, stop)
-
-	if enableReconciler {
-		log.Info().Msgf("OSM reconciler enabled for validating webhook")
-		err = reconciler.NewReconcilerClient(kubeClient, nil, meshName, osmVersion, stop, reconciler.ValidatingWebhookInformerKey)
-		if err != nil {
-			events.GenericEventRecorder().FatalEvent(err, events.InitializationError, "Error creating reconciler client to reconcile validating webhook")
-		}
-	}
 
 	<-stop
 	log.Info().Msgf("Stopping osm-controller %s; %s; %s", version.Version, version.GitCommit, version.BuildDate)

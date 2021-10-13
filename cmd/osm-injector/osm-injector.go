@@ -23,7 +23,6 @@ import (
 	configClientset "github.com/openservicemesh/osm/pkg/gen/client/config/clientset/versioned"
 	policyClientset "github.com/openservicemesh/osm/pkg/gen/client/policy/clientset/versioned"
 	"github.com/openservicemesh/osm/pkg/messaging"
-	"github.com/openservicemesh/osm/pkg/reconciler"
 
 	"github.com/openservicemesh/osm/pkg/certificate/providers"
 	"github.com/openservicemesh/osm/pkg/configurator"
@@ -45,17 +44,12 @@ var (
 	meshName           string // An ID that uniquely identifies an OSM instance
 	kubeConfigFile     string
 	osmNamespace       string
-	webhookConfigName  string
 	caBundleSecretName string
 	osmMeshConfigName  string
-	webhookTimeout     int32
-	osmVersion         string
 
 	injectorConfig injector.Config
 
 	certProviderKind string
-
-	enableReconciler bool
 
 	tresorOptions      providers.TresorOptions
 	vaultOptions       providers.VaultOptions
@@ -74,10 +68,7 @@ func init() {
 	flags.StringVar(&meshName, "mesh-name", "", "OSM mesh name")
 	flags.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to Kubernetes config file.")
 	flags.StringVar(&osmNamespace, "osm-namespace", "", "Namespace to which OSM belongs to.")
-	flags.StringVar(&webhookConfigName, "webhook-config-name", "", "Name of the MutatingWebhookConfiguration to be configured by osm-injector")
-	flags.Int32Var(&webhookTimeout, "webhook-timeout", int32(20), "Timeout of the MutatingWebhookConfiguration")
 	flags.StringVar(&osmMeshConfigName, "osm-config-name", "osm-mesh-config", "Name of the OSM MeshConfig")
-	flags.StringVar(&osmVersion, "osm-version", "", "Version of OSM")
 
 	// sidecar injector options
 	flags.IntVar(&injectorConfig.ListenPort, "webhook-port", constants.InjectorWebhookPort, "Webhook port for sidecar-injector")
@@ -97,9 +88,6 @@ func init() {
 	flags.StringVar(&certManagerOptions.IssuerName, "cert-manager-issuer-name", "osm-ca", "cert-manager issuer name")
 	flags.StringVar(&certManagerOptions.IssuerKind, "cert-manager-issuer-kind", "Issuer", "cert-manager issuer kind")
 	flags.StringVar(&certManagerOptions.IssuerGroup, "cert-manager-issuer-group", "cert-manager.io", "cert-manager issuer group")
-
-	// Reconciler options
-	flags.BoolVar(&enableReconciler, "enable-reconciler", false, "Enable reconciler for CDRs, mutating webhook and validating webhook")
 
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = admissionv1.AddToScheme(scheme)
@@ -172,7 +160,7 @@ func main() {
 	}
 
 	// Initialize the sidecar injector webhook
-	if err := injector.NewMutatingWebhook(injectorConfig, kubeClient, certManager, kubeController, meshName, osmNamespace, webhookConfigName, osmVersion, webhookTimeout, enableReconciler, stop, cfg); err != nil {
+	if err := injector.NewMutatingWebhook(injectorConfig, kubeClient, certManager, kubeController, meshName, osmNamespace, stop, cfg); err != nil {
 		events.GenericEventRecorder().FatalEvent(err, events.InitializationError, "Error creating sidecar injector webhook")
 	}
 
@@ -192,14 +180,6 @@ func main() {
 
 	// Start the global log level watcher that updates the log level dynamically
 	go k8s.WatchAndUpdateLogLevel(msgBroker, stop)
-
-	if enableReconciler {
-		log.Info().Msgf("OSM reconciler enabled for sidecar injector webhook")
-		err = reconciler.NewReconcilerClient(kubeClient, nil, meshName, osmVersion, stop, reconciler.MutatingWebhookInformerKey)
-		if err != nil {
-			events.GenericEventRecorder().FatalEvent(err, events.InitializationError, "Error creating reconciler client to reconcile sidecar injector webhook")
-		}
-	}
 
 	<-stop
 	log.Info().Msgf("Stopping osm-injector %s; %s; %s", version.Version, version.GitCommit, version.BuildDate)
@@ -240,10 +220,6 @@ func validateCLIParams() error {
 
 	if osmNamespace == "" {
 		return errors.New("Please specify the OSM namespace using --osm-namespace")
-	}
-
-	if webhookConfigName == "" {
-		return errors.Errorf("Please specify the mutatingwebhookconfiguration name using --webhook-config-name value")
 	}
 
 	if caBundleSecretName == "" {

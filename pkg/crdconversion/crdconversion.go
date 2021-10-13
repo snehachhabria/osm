@@ -36,7 +36,7 @@ const (
 	ingressBackendsPolicyConverterPath = "/convert/ingressbackendspolicy"
 )
 
-var crdConversionWebhookConfiguration = map[string]string{
+var CrdConversionWebhookConfiguration = map[string]string{
 	"traffictargets.access.smi-spec.io":              trafficAccessConverterPath,
 	"httproutegroups.specs.smi-spec.io":              httpRouteGroupConverterPath,
 	"meshconfigs.config.openservicemesh.io":          meshConfigConverterPath,
@@ -163,7 +163,7 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 }
 
 func patchCrds(cert certificate.Certificater, crdClient apiclient.ApiextensionsV1Interface, osmNamespace string, enableReconciler bool) error {
-	for crdName, crdConversionPath := range crdConversionWebhookConfiguration {
+	for crdName, crdConversionPath := range CrdConversionWebhookConfiguration {
 		if err := updateCrdConfiguration(cert, crdClient, osmNamespace, crdName, crdConversionPath, enableReconciler); err != nil {
 			log.Error().Err(err).Msgf("Error updating conversion webhook configuration for crd : %s", crdName)
 			return err

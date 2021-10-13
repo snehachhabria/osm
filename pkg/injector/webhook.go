@@ -50,22 +50,10 @@ const (
 )
 
 // NewMutatingWebhook starts a new web server handling requests from the injector MutatingWebhookConfiguration
-func NewMutatingWebhook(config Config, kubeClient kubernetes.Interface, certManager certificate.Manager, kubeController k8s.Controller, meshName, osmNamespace, webhookConfigName, osmVersion string, webhookTimeout int32, enableReconciler bool, stop <-chan struct{}, cfg configurator.Configurator) error {
-	// This is a certificate issued for the webhook handler
-	// This cert does not have to be related to the Envoy certs, but it does have to match
-	// the cert provisioned with the MutatingWebhookConfiguration
-	webhookHandlerCert, err := certManager.IssueCertificate(
-		certificate.CommonName(fmt.Sprintf("%s.%s.svc", constants.OSMInjectorName, osmNamespace)),
-		constants.XDSCertificateValidityPeriod)
+func NewMutatingWebhook(config Config, kubeClient kubernetes.Interface, certManager certificate.Manager, kubeController k8s.Controller, meshName, osmNamespace string, stop <-chan struct{}, cfg configurator.Configurator) error {
+	webhookHandlerCert, err := providers.GetCertFromKubernetes(osmNamespace, constants.MutatingWebhookCertificateSecretName, kubeClient)
 	if err != nil {
-		return errors.Errorf("Error issuing certificate for the mutating webhook: %+v", err)
-	}
-
-	// The following function ensures to atomically create or get the certificate from Kubernetes
-	// secret API store. Multiple instances should end up with the same webhookHandlerCert after this function executed.
-	webhookHandlerCert, err = providers.GetCertificateFromSecret(osmNamespace, constants.MutatingWebhookCertificateSecretName, webhookHandlerCert, kubeClient)
-	if err != nil {
-		return errors.Errorf("Error fetching webhook certificate from k8s secret: %s", err)
+		return errors.Errorf("Error fetching mutating webhook certificate from k8s secret: %s", err)
 	}
 
 	wh := mutatingWebhook{
@@ -88,10 +76,6 @@ func NewMutatingWebhook(config Config, kubeClient kubernetes.Interface, certMana
 
 	// Start the MutatingWebhook web server
 	go wh.run(stop)
-
-	if err = createOrUpdateMutatingWebhook(wh.kubeClient, webhookHandlerCert, webhookTimeout, webhookConfigName, meshName, osmNamespace, osmVersion, enableReconciler); err != nil {
-		return errors.Errorf("Error creating MutatingWebhookConfiguration %s: %+v", webhookConfigName, err)
-	}
 	return nil
 }
 
@@ -393,7 +377,28 @@ func patchAdmissionResponse(resp *admissionv1.AdmissionResponse, patchBytes []by
 	resp.PatchType = &pt
 }
 
-func createOrUpdateMutatingWebhook(clientSet kubernetes.Interface, cert certificate.Certificater, webhookTimeout int32, webhookName, meshName, osmNamespace, osmVersion string, enableReconciler bool) error {
+func CreateOrUpdateMutatingWebhook(kubeClient kubernetes.Interface, certManager certificate.Manager, webhookTimeout int32, webhookName, meshName, osmNamespace, osmVersion string, enableReconciler bool) error {
+	// This is a certificate issued for the webhook handler
+	// This cert does not have to be related to the Envoy certs, but it does have to match
+	// the cert provisioned with the MutatingWebhookConfiguration
+	webhookHandlerCert, err := certManager.IssueCertificate(
+		certificate.CommonName(fmt.Sprintf("%s.%s.svc", constants.OSMInjectorName, osmNamespace)),
+		constants.XDSCertificateValidityPeriod)
+	if err != nil {
+		return errors.Errorf("Error issuing certificate for the mutating webhook: %+v", err)
+	}
+
+	// The following function ensures to atomically create or get the certificate from Kubernetes
+	// secret API store. Multiple instances should end up with the same webhookHandlerCert after this function executed.
+	webhookHandlerCert, err = providers.GetCertificateFromSecret(osmNamespace, constants.MutatingWebhookCertificateSecretName, webhookHandlerCert, kubeClient)
+	if err != nil {
+		return errors.Errorf("Error fetching webhook certificate from k8s secret: %s", err)
+	}
+
+	log.Info().Msgf("TEST listing all certificates in cert cache after mwhc creation")
+	certs, err := certManager.ListCertificates()
+	log.Info().Msgf(" TEST Certs : %v", certs)
+
 	webhookPath := webhookCreatePod
 	webhookPort := int32(constants.InjectorWebhookPort)
 	failuerPolicy := admissionregv1.Fail
@@ -429,7 +434,7 @@ func createOrUpdateMutatingWebhook(clientSet kubernetes.Interface, cert certific
 						Path:      &webhookPath,
 						Port:      &webhookPort,
 					},
-					CABundle: cert.GetCertificateChain()},
+					CABundle: webhookHandlerCert.GetCertificateChain()},
 				FailurePolicy: &failuerPolicy,
 				MatchPolicy:   &matchPolict,
 				NamespaceSelector: &metav1.LabelSelector{
@@ -470,10 +475,10 @@ func createOrUpdateMutatingWebhook(clientSet kubernetes.Interface, cert certific
 				AdmissionReviewVersions: []string{"v1"}}},
 	}
 
-	if _, err := clientSet.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.Background(), &mwhc, metav1.CreateOptions{}); err != nil {
+	if _, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.Background(), &mwhc, metav1.CreateOptions{}); err != nil {
 		// Webhook already exists, update the webhook in this scenario
 		if apierrors.IsAlreadyExists(err) {
-			existingMwhc, err := clientSet.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.Background(), mwhc.Name, metav1.GetOptions{})
+			existingMwhc, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.Background(), mwhc.Name, metav1.GetOptions{})
 			if err != nil {
 				log.Error().Err(err).Str(errcode.Kind, errcode.GetErrCodeWithMetric(errcode.ErrUpdatingMutatingWebhook)).
 					Msgf("Error getting MutatingWebhookConfiguration %s", webhookName)
@@ -482,7 +487,7 @@ func createOrUpdateMutatingWebhook(clientSet kubernetes.Interface, cert certific
 
 			existingMwhc.Webhooks = mwhc.Webhooks
 			existingMwhc.Labels = mwhc.Labels
-			if _, err = clientSet.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(context.Background(), existingMwhc, metav1.UpdateOptions{}); err != nil {
+			if _, err = kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(context.Background(), existingMwhc, metav1.UpdateOptions{}); err != nil {
 				// There might be conflicts when multiple injectors try to update the same resource
 				// One of the injectors will successfully update the resource, hence conflicts shoud be ignored and not treated as an error
 				if !apierrors.IsConflict(err) {

@@ -77,58 +77,52 @@ func TestValidateCertificateManagerOptions(t *testing.T) {
 
 func TestValidateCLIParams(t *testing.T) {
 	testCases := []struct {
-		name                       string
-		certProvider               string
-		meshName                   string
-		osmNamespace               string
-		validatorWebhookConfigName string
-		caBundleSecretName         string
-		expectError                bool
+		name               string
+		certProvider       string
+		meshName           string
+		osmNamespace       string
+		caBundleSecretName string
+		expectError        bool
 	}{
 		{
-			name:                       "none of the necessary CLI params are empty",
-			certProvider:               providers.TresorKind.String(),
-			meshName:                   "test-mesh",
-			osmNamespace:               "test-ns",
-			validatorWebhookConfigName: "test-webhook",
-			caBundleSecretName:         "test-secret",
-			expectError:                false,
+			name:               "none of the necessary CLI params are empty",
+			certProvider:       providers.TresorKind.String(),
+			meshName:           "test-mesh",
+			osmNamespace:       "test-ns",
+			caBundleSecretName: "test-secret",
+			expectError:        false,
 		},
 		{
-			name:                       "mesh name is empty",
-			certProvider:               providers.TresorKind.String(),
-			meshName:                   "",
-			osmNamespace:               "test-ns",
-			validatorWebhookConfigName: "test-webhook",
-			caBundleSecretName:         "test-secret",
-			expectError:                true,
+			name:               "mesh name is empty",
+			certProvider:       providers.TresorKind.String(),
+			meshName:           "",
+			osmNamespace:       "test-ns",
+			caBundleSecretName: "test-secret",
+			expectError:        true,
 		},
 		{
-			name:                       "osm namespace is empty",
-			certProvider:               providers.TresorKind.String(),
-			meshName:                   "test-mesh",
-			osmNamespace:               "",
-			validatorWebhookConfigName: "test-webhook",
-			caBundleSecretName:         "test-secret",
-			expectError:                true,
+			name:               "osm namespace is empty",
+			certProvider:       providers.TresorKind.String(),
+			meshName:           "test-mesh",
+			osmNamespace:       "",
+			caBundleSecretName: "test-secret",
+			expectError:        true,
 		},
 		{
-			name:                       "validator webhook is empty",
-			certProvider:               providers.TresorKind.String(),
-			meshName:                   "test-mesh",
-			osmNamespace:               "test-ns",
-			validatorWebhookConfigName: "",
-			caBundleSecretName:         "test-secret",
-			expectError:                true,
+			name:               "validator webhook is empty",
+			certProvider:       providers.TresorKind.String(),
+			meshName:           "test-mesh",
+			osmNamespace:       "test-ns",
+			caBundleSecretName: "test-secret",
+			expectError:        true,
 		},
 		{
-			name:                       "cabundle is empty",
-			certProvider:               providers.TresorKind.String(),
-			meshName:                   "test-mesh",
-			osmNamespace:               "test-ns",
-			validatorWebhookConfigName: "test-webhook",
-			caBundleSecretName:         "",
-			expectError:                true,
+			name:               "cabundle is empty",
+			certProvider:       providers.TresorKind.String(),
+			meshName:           "test-mesh",
+			osmNamespace:       "test-ns",
+			caBundleSecretName: "",
+			expectError:        true,
 		},
 	}
 
@@ -138,7 +132,6 @@ func TestValidateCLIParams(t *testing.T) {
 			certProviderKind = tc.certProvider
 			meshName = tc.meshName
 			osmNamespace = tc.osmNamespace
-			validatorWebhookConfigName = tc.validatorWebhookConfigName
 			caBundleSecretName = tc.caBundleSecretName
 			err := validateCLIParams()
 			assert.Equal(err != nil, tc.expectError)

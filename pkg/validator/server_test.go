@@ -137,10 +137,6 @@ func TestHandleValidation(t *testing.T) {
 
 func TestNewValidatingWebhook(t *testing.T) {
 	testNamespace := "test-namespace"
-	testMeshName := "test-mesh"
-	testVersion := "test-version"
-	enableReconciler := false
-	validateTrafficTarget := true
 	t.Run("successful startup", func(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		cfg := configurator.NewMockConfigurator(mockCtrl)
@@ -156,7 +152,7 @@ func TestNewValidatingWebhook(t *testing.T) {
 		}
 		kube := fake.NewSimpleClientset(webhook)
 
-		err := NewValidatingWebhook(webhook.Name, testNamespace, testVersion, testMeshName, enableReconciler, validateTrafficTarget, port, certManager, kube, nil)
+		err := NewValidatingWebhook(testNamespace, port, certManager, kube, nil)
 		tassert.NoError(t, err)
 	})
 
@@ -164,14 +160,13 @@ func TestNewValidatingWebhook(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		cfg := configurator.NewMockConfigurator(mockCtrl)
 		certManager := tresor.NewFakeCertManager(cfg)
-		enableReconciler = true
 
 		port := 41414
 		stop := make(chan struct{})
 		defer close(stop)
 		kube := fake.NewSimpleClientset()
 
-		err := NewValidatingWebhook("my-webhook", testNamespace, testVersion, testMeshName, enableReconciler, validateTrafficTarget, port, certManager, kube, nil)
+		err := NewValidatingWebhook(testNamespace, port, certManager, kube, nil)
 		tassert.NoError(t, err)
 	})
 
@@ -179,15 +174,13 @@ func TestNewValidatingWebhook(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		cfg := configurator.NewMockConfigurator(mockCtrl)
 		certManager := tresor.NewFakeCertManager(cfg)
-		enableReconciler = true
-		validateTrafficTarget = false
 
 		port := 41414
 		stop := make(chan struct{})
 		defer close(stop)
 		kube := fake.NewSimpleClientset()
 
-		err := NewValidatingWebhook("my-webhook", testNamespace, testVersion, testMeshName, enableReconciler, validateTrafficTarget, port, certManager, kube, nil)
+		err := NewValidatingWebhook(testNamespace, port, certManager, kube, nil)
 		tassert.NoError(t, err)
 	})
 }

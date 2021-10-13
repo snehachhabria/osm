@@ -36,22 +36,10 @@ type validatingWebhookServer struct {
 }
 
 // NewValidatingWebhook returns a validatingWebhookServer with the defaultValidators that were previously registered.
-func NewValidatingWebhook(webhookConfigName, osmNamespace, osmVersion, meshName string, enableReconciler, validateTrafficTarget bool, port int, certManager certificate.Manager, kubeClient kubernetes.Interface, stop <-chan struct{}) error {
-	// This is a certificate issued for the webhook handler
-	// This cert does not have to be related to the Envoy certs, but it does have to match
-	// the cert provisioned with the ValidatingWebhookConfiguration
-	webhookHandlerCert, err := certManager.IssueCertificate(
-		certificate.CommonName(fmt.Sprintf("%s.%s.svc", ValidatorWebhookSvc, osmNamespace)),
-		constants.XDSCertificateValidityPeriod)
+func NewValidatingWebhook(osmNamespace string, port int, certManager certificate.Manager, kubeClient kubernetes.Interface, stop <-chan struct{}) error {
+	webhookHandlerCert, err := providers.GetCertFromKubernetes(osmNamespace, constants.ValidatingWebhookCertificateSecretName, kubeClient)
 	if err != nil {
-		return errors.Errorf("Error issuing certificate for the validating webhook: %+v", err)
-	}
-
-	// The following function ensures to atomically create or get the certificate from Kubernetes
-	// secret API store. Multiple instances should end up with the same webhookHandlerCert after this function executed.
-	webhookHandlerCert, err = providers.GetCertificateFromSecret(osmNamespace, constants.ValidatingWebhookCertificateSecretName, webhookHandlerCert, kubeClient)
-	if err != nil {
-		return errors.Errorf("Error fetching webhook certificate from k8s secret: %s", err)
+		return errors.Errorf("Error fetching validator webhook certificate from k8s secret: %s", err)
 	}
 
 	v := &validatingWebhookServer{
@@ -60,11 +48,6 @@ func NewValidatingWebhook(webhookConfigName, osmNamespace, osmVersion, meshName 
 			policyv1alpha1.SchemeGroupVersion.WithKind("Egress").String():         egressValidator,
 			smiAccess.SchemeGroupVersion.WithKind("TrafficTarget").String():       trafficTargetValidator,
 		},
-	}
-
-	// Create the ValidatingWebhook
-	if err := createOrUpdateValidatingWebhook(kubeClient, webhookHandlerCert, webhookConfigName, meshName, osmNamespace, osmVersion, validateTrafficTarget, enableReconciler); err != nil {
-		return errors.Errorf("Error creating ValidatingWebhookConfiguration %s: %+v", webhookConfigName, err)
 	}
 
 	go v.run(port, webhookHandlerCert, stop)

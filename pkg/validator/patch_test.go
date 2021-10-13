@@ -12,6 +12,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/openservicemesh/osm/pkg/certificate"
+	"github.com/openservicemesh/osm/pkg/certificate/providers/tresor"
+	"github.com/openservicemesh/osm/pkg/configurator"
 	"github.com/openservicemesh/osm/pkg/constants"
 )
 
@@ -65,12 +67,16 @@ func TestCreateValidatingWebhook(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := tassert.New(t)
 			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
 			cert := certificate.NewMockCertificater(mockCtrl)
 			cert.EXPECT().GetCertificateChain()
+			mockConfigurator := configurator.NewMockConfigurator(mockCtrl)
+			certManager := tresor.NewFakeCertManager(mockConfigurator)
 
 			kubeClient := fake.NewSimpleClientset()
 
-			err := createOrUpdateValidatingWebhook(kubeClient, cert, webhookName, meshName, osmNamespace, osmVersion, tc.validateTrafficTarget, enableReconciler)
+			err := CreateOrUpdateValidatingWebhook(kubeClient, certManager, webhookName, meshName, osmNamespace, osmVersion, tc.validateTrafficTarget, enableReconciler)
 			assert.Nil(err)
 			webhooks, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(context.TODO(), metav1.ListOptions{})
 			assert.Nil(err)

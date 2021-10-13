@@ -31,12 +31,14 @@ import (
 	configClientset "github.com/openservicemesh/osm/pkg/gen/client/config/clientset/versioned"
 	"github.com/openservicemesh/osm/pkg/httpserver"
 	httpserverconstants "github.com/openservicemesh/osm/pkg/httpserver/constants"
+	"github.com/openservicemesh/osm/pkg/injector"
 	"github.com/openservicemesh/osm/pkg/k8s/events"
 	"github.com/openservicemesh/osm/pkg/logger"
 	"github.com/openservicemesh/osm/pkg/messaging"
 	"github.com/openservicemesh/osm/pkg/metricsstore"
 	"github.com/openservicemesh/osm/pkg/reconciler"
 	"github.com/openservicemesh/osm/pkg/signals"
+	"github.com/openservicemesh/osm/pkg/validator"
 	"github.com/openservicemesh/osm/pkg/version"
 )
 
@@ -63,6 +65,15 @@ var (
 	certManagerOptions providers.CertManagerOptions
 
 	enableReconciler bool
+	deleteCrds       bool
+
+	//sidecar injector options
+	webhookConfigName string
+	webhookTimeout    int32
+
+	//validator webhook options
+	validatorWebhookConfigName string
+	validateTrafficTarget      bool
 
 	scheme = runtime.NewScheme()
 )
@@ -101,8 +112,17 @@ func init() {
 	flags.StringVar(&certManagerOptions.IssuerKind, "cert-manager-issuer-kind", "Issuer", "cert-manager issuer kind")
 	flags.StringVar(&certManagerOptions.IssuerGroup, "cert-manager-issuer-group", "cert-manager.io", "cert-manager issuer group")
 
+	//sidecar injector options
+	flags.StringVar(&webhookConfigName, "webhook-config-name", "", "Name of the MutatingWebhookConfiguration to be configured by osm-bootstrap")
+	flags.Int32Var(&webhookTimeout, "webhook-timeout", int32(20), "Timeout of the MutatingWebhookConfiguration")
+
+	// validator webhook options
+	flags.StringVar(&validatorWebhookConfigName, "validator-webhook-config", "", "Name of the ValidatingWebhookConfiguration for the resource validator webhook")
+	flags.BoolVar(&validateTrafficTarget, "validate-traffic-target", true, "Enable traffic target validation")
+
 	// Reconciler options
 	flags.BoolVar(&enableReconciler, "enable-reconciler", false, "Enable reconciler for CDRs, mutating webhook and validating webhook")
+	flags.BoolVar(&deleteCrds, "delete-crds", false, "Delete the CRDs managed by OSM on uninstall")
 
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = admissionv1.AddToScheme(scheme)
@@ -179,6 +199,16 @@ func main() {
 			"Error initializing certificate manager of kind %s", certProviderKind)
 	}
 
+	// Create or update the sidecar injector webhook configuration
+	if err = injector.CreateOrUpdateMutatingWebhook(kubeClient, certManager, webhookTimeout, webhookConfigName, meshName, osmNamespace, osmVersion, enableReconciler); err != nil {
+		events.GenericEventRecorder().FatalEvent(err, events.InitializationError, fmt.Sprintf("Error creating MutatingWebhookConfiguration %s", webhookConfigName))
+	}
+
+	// Create or update the validating webhook configuration
+	if err := validator.CreateOrUpdateValidatingWebhook(kubeClient, certManager, validatorWebhookConfigName, meshName, osmNamespace, osmVersion, validateTrafficTarget, enableReconciler); err != nil {
+		events.GenericEventRecorder().FatalEvent(err, events.InitializationError, fmt.Sprintf("Error creating ValidatingWebhookConfiguration %s", validatorWebhookConfigName))
+	}
+
 	// Initialize the crd conversion webhook server to support the conversion of OSM's CRDs
 	crdConverterConfig.ListenPort = 9443
 	if err := crdconversion.NewConversionWebhook(crdConverterConfig, kubeClient, crdClient, certManager, osmNamespace, enableReconciler, stop); err != nil {
@@ -201,13 +231,14 @@ func main() {
 
 	if enableReconciler {
 		log.Info().Msgf("OSM reconciler enabled for custom resource definitions")
-		err = reconciler.NewReconcilerClient(kubeClient, apiServerClient, meshName, osmVersion, stop, reconciler.CrdInformerKey)
+		err = reconciler.NewReconcilerClient(kubeClient, apiServerClient, meshName, osmVersion, stop, reconciler.CrdInformerKey, reconciler.MutatingWebhookInformerKey, reconciler.ValidatingWebhookInformerKey)
 		if err != nil {
-			events.GenericEventRecorder().FatalEvent(err, events.InitializationError, "Error creating reconciler client for custom resource definitions")
+			events.GenericEventRecorder().FatalEvent(err, events.InitializationError, "Error creating reconciler client for CRDs, mutating webhook and validating webhook")
 		}
 	}
 
 	<-stop
+	CleanupOsmManagedResources(kubeClient, crdClient, validatorWebhookConfigName, webhookConfigName, deleteCrds)
 	log.Info().Msgf("Stopping osm-bootstrap %s; %s; %s", version.Version, version.GitCommit, version.BuildDate)
 }
 
@@ -294,8 +325,20 @@ func validateCLIParams() error {
 		return errors.New("Please specify the OSM namespace using --osm-namespace")
 	}
 
+	if meshName == "" {
+		return errors.New("Please specify the mesh name using --mesh-name")
+	}
+
 	if caBundleSecretName == "" {
 		return errors.Errorf("Please specify the CA bundle secret name using --ca-bundle-secret-name")
+	}
+
+	if webhookConfigName == "" {
+		return errors.Errorf("Please specify the mutatingwebhookconfiguration name using --webhook-config-name value")
+	}
+
+	if validatorWebhookConfigName == "" {
+		return errors.Errorf("Please specify the webhook configuration name using --validator-webhook-config")
 	}
 
 	return nil
@@ -318,5 +361,36 @@ func buildDefaultMeshConfig(presetMeshConfigMap *corev1.ConfigMap) *v1alpha1.Mes
 			Name: meshConfigName,
 		},
 		Spec: presetMeshConfigSpec,
+	}
+}
+
+func CleanupOsmManagedResources(kubeClient kubernetes.Interface, crdClient apiclient.ApiextensionsV1Interface, validatorWebhookConfigName, webhookConfigName string, deleteCrds bool) {
+	log.Info().Msgf("DELETING OSM Managed components")
+	// Delete OSM's sidecar injector webhook
+	if err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.Background(), webhookConfigName, metav1.DeleteOptions{}); err != nil {
+		// Mutating webhook already deleted from cluster
+		if !(apierrors.IsNotFound(err) || apierrors.IsGone(err)) {
+			log.Fatal().Err(err).Msgf("Error deleting MutatingWebhookConfiguration : %s", webhookConfigName)
+		}
+	}
+
+	// Delete OSM's validator webhook
+	if err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.Background(), validatorWebhookConfigName, metav1.DeleteOptions{}); err != nil {
+		// Validating webhook already deleted from cluster
+		if !(apierrors.IsNotFound(err) || apierrors.IsGone(err)) {
+			log.Fatal().Err(err).Msgf("Error deleting ValidatingWebhookConfiguration : %s", validatorWebhookConfigName)
+		}
+	}
+
+	// Delete OSM's CRDs
+	if deleteCrds {
+		for crdName := range crdconversion.CrdConversionWebhookConfiguration {
+			if err := crdClient.CustomResourceDefinitions().Delete(context.Background(), crdName, metav1.DeleteOptions{}); err != nil {
+				// crd already deleted from cluster
+				if !(apierrors.IsNotFound(err) || apierrors.IsGone(err)) {
+					log.Fatal().Err(err).Msgf("Error deleting crd : %s", crdName)
+				}
+			}
+		}
 	}
 }

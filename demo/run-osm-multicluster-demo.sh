@@ -45,6 +45,7 @@ USE_PRIVATE_REGISTRY="${USE_PRIVATE_REGISTRY:-true}"
 ALPHA_CLUSTER="${ALPHA_CLUSTER:-alpha}"
 BETA_CLUSTER="${BETA_CLUSTER:-beta}"
 MULTICLUSTER_CONTEXTS="${MULTICLUSTER_CONTEXTS:-$ALPHA_CLUSTER $BETA_CLUSTER}"
+DELETE_CRDS="${DELETE_CRDS:-false}"
 
 # For any additional installation arguments. Used heavily in CI.
 optionalInstallArgs=$*
@@ -130,6 +131,7 @@ for CONTEXT in $MULTICLUSTER_CONTEXTS; do
         --set=OpenServiceMesh.featureFlags.enableMulticlusterMode="true" \
         --set=OpenServiceMesh.featureFlags.enableEnvoyActiveHealthChecks="true" \
         --timeout="$TIMEOUT" \
+        --set=OpenServiceMesh.deleteCrds="$DELETE_CRDS" \
         $optionalInstallArgs
 
     ./demo/configure-app-namespaces.sh

@@ -2,6 +2,7 @@ package validator
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
@@ -10,8 +11,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/openservicemesh/osm/pkg/certificate"
+	"github.com/openservicemesh/osm/pkg/certificate/providers"
 	"github.com/openservicemesh/osm/pkg/constants"
 	"github.com/openservicemesh/osm/pkg/errcode"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -22,7 +25,28 @@ const (
 	ValidatorWebhookSvc = "osm-validator"
 )
 
-func createOrUpdateValidatingWebhook(clientSet kubernetes.Interface, cert certificate.Certificater, webhookName, meshName, osmNamespace, osmVersion string, validateTrafficTarget bool, enableReconciler bool) error {
+func CreateOrUpdateValidatingWebhook(kubeClient kubernetes.Interface, certManager certificate.Manager, webhookName, meshName, osmNamespace, osmVersion string, validateTrafficTarget bool, enableReconciler bool) error {
+	// This is a certificate issued for the webhook handler
+	// This cert does not have to be related to the Envoy certs, but it does have to match
+	// the cert provisioned with the ValidatingWebhookConfiguration
+	webhookHandlerCert, err := certManager.IssueCertificate(
+		certificate.CommonName(fmt.Sprintf("%s.%s.svc", ValidatorWebhookSvc, osmNamespace)),
+		constants.XDSCertificateValidityPeriod)
+	if err != nil {
+		return errors.Errorf("Error issuing certificate for the validating webhook: %+v", err)
+	}
+
+	// The following function ensures to atomically create or get the certificate from Kubernetes
+	// secret API store. Multiple instances should end up with the same webhookHandlerCert after this function executed.
+	webhookHandlerCert, err = providers.GetCertificateFromSecret(osmNamespace, constants.ValidatingWebhookCertificateSecretName, webhookHandlerCert, kubeClient)
+	if err != nil {
+		return errors.Errorf("Error fetching webhook certificate from k8s secret: %s", err)
+	}
+
+	log.Info().Msgf("TEST listing all certificates in cert cache after vwhc creation")
+	certs, err := certManager.ListCertificates()
+	log.Info().Msgf(" TEST Certs : %v", certs)
+
 	webhookPath := validationAPIPath
 	webhookPort := int32(constants.ValidatorWebhookPort)
 	failuerPolicy := admissionregv1.Fail
@@ -76,7 +100,7 @@ func createOrUpdateValidatingWebhook(clientSet kubernetes.Interface, cert certif
 						Path:      &webhookPath,
 						Port:      &webhookPort,
 					},
-					CABundle: cert.GetCertificateChain()},
+					CABundle: webhookHandlerCert.GetCertificateChain()},
 				FailurePolicy: &failuerPolicy,
 				MatchPolicy:   &matchPolict,
 				NamespaceSelector: &metav1.LabelSelector{
@@ -107,10 +131,10 @@ func createOrUpdateValidatingWebhook(clientSet kubernetes.Interface, cert certif
 				AdmissionReviewVersions: []string{"v1"}}},
 	}
 
-	if _, err := clientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.Background(), &vwhc, metav1.CreateOptions{}); err != nil {
+	if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.Background(), &vwhc, metav1.CreateOptions{}); err != nil {
 		// Webhook already exists, update the webhook in this scenario
 		if apierrors.IsAlreadyExists(err) {
-			existingVwhc, err := clientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), vwhc.Name, metav1.GetOptions{})
+			existingVwhc, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.Background(), vwhc.Name, metav1.GetOptions{})
 			if err != nil {
 				log.Error().Err(err).Str(errcode.Kind, errcode.GetErrCodeWithMetric(errcode.ErrUpdatingMutatingWebhook)).
 					Msgf("Error getting ValidatingWebhookConfiguration %s", webhookName)
@@ -119,7 +143,7 @@ func createOrUpdateValidatingWebhook(clientSet kubernetes.Interface, cert certif
 
 			existingVwhc.Webhooks = vwhc.Webhooks
 			existingVwhc.Labels = vwhc.Labels
-			if _, err = clientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(context.Background(), existingVwhc, metav1.UpdateOptions{}); err != nil {
+			if _, err = kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(context.Background(), existingVwhc, metav1.UpdateOptions{}); err != nil {
 				// There might be conflicts when multiple controllers try to update the same resource
 				// One of the controllers will successfully update the resource, hence conflicts shoud be ignored and not treated as an error
 				if !apierrors.IsConflict(err) {

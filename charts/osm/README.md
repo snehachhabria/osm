@@ -69,6 +69,7 @@ The following table lists the configurable parameters of the osm chart and their
 | OpenServiceMesh.configResyncInterval | string | `"0s"` | Sets the resync interval for regular proxy broadcast updates, set to 0s to not enforce any resync |
 | OpenServiceMesh.controlPlaneTolerations | list | `[]` | Node tolerations applied to control plane pods. The specified tolerations allow pods to schedule onto nodes with matching taints. |
 | OpenServiceMesh.controllerLogLevel | string | `"info"` | Controller log verbosity |
+| OpenServiceMesh.deleteCrds | bool | `false` | Delete the CRDs managed by OSM on uninstall |
 | OpenServiceMesh.deployGrafana | bool | `false` | Deploy Grafana with OSM installation |
 | OpenServiceMesh.deployJaeger | bool | `false` | Deploy Jaeger during OSM installation |
 | OpenServiceMesh.deployPrometheus | bool | `false` | Deploy Prometheus with OSM installation |
@@ -77,7 +78,7 @@ The following table lists the configurable parameters of the osm chart and their
 | OpenServiceMesh.enableFluentbit | bool | `false` | Enable Fluent Bit sidecar deployment on OSM controller's pod |
 | OpenServiceMesh.enablePermissiveTrafficPolicy | bool | `false` | Enable permissive traffic policy mode |
 | OpenServiceMesh.enablePrivilegedInitContainer | bool | `false` | Run init container in privileged mode |
-| OpenServiceMesh.enableReconciler | bool | `false` | Enable reconciler for OSM's CRDs and mutating webhook |
+| OpenServiceMesh.enableReconciler | bool | `false` | Enable reconciler for OSM's CRDs, mutating webhook and validating webhook |
 | OpenServiceMesh.enforceSingleMesh | bool | `true` | Enforce only deploying one mesh in the cluster |
 | OpenServiceMesh.envoyLogLevel | string | `"error"` | Log level for the Envoy proxy sidecar. Non developers should generally never set this value. In production environments the LogLevel should be set to `error` |
 | OpenServiceMesh.featureFlags.enableAsyncProxyServiceMapping | bool | `false` | Enable async proxy-service mapping |

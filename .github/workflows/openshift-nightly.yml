@@ -39,6 +39,7 @@ jobs:
           BOOKTHIEF_EXPECTED_RESPONSE_CODE: "0"
           ENABLE_EGRESS: "false"
           ENABLE_RECONCILER: "false"
+          DELETE_CRDS: "false"
           DEPLOY_TRAFFIC_SPLIT: "true"
           DEPLOY_ON_OPENSHIFT: "true"
           TIMEOUT: 150s

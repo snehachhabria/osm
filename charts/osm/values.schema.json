@@ -138,6 +138,7 @@
                 "enablePermissiveTrafficPolicy",
                 "enableEgress",
                 "enableReconciler",
+                "deleteCrds",
                 "deployPrometheus",
                 "deployGrafana",
                 "enableFluentbit",
@@ -397,6 +398,15 @@
                     "type": "boolean",
                     "title": "The enableReconciler schema",
                     "description": "Indicates whether OSM's reconciler should be enabled or not.",
+                    "examples": [
+                        false
+                    ]
+                },
+                "deleteCrds": {
+                    "$id": "#/properties/OpenServiceMesh/properties/deleteCrds",
+                    "type": "boolean",
+                    "title": "The deleteCrds schema",
+                    "description": "Indicates whether the CRDs managed by OSM should be deleted on uninstall.",
                     "examples": [
                         false
                     ]

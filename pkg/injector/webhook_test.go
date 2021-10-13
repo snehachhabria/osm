@@ -36,7 +36,6 @@ import (
 
 func TestCreateMutatingWebhook(t *testing.T) {
 	assert := tassert.New(t)
-	cert := mockCertificate{}
 	webhookName := "--webhookName--"
 	webhookTimeout := int32(20)
 	meshName := "test-mesh"
@@ -46,8 +45,12 @@ func TestCreateMutatingWebhook(t *testing.T) {
 	webhookPort := int32(constants.InjectorWebhookPort)
 	enableReconciler := true
 
+	mockController := gomock.NewController(GinkgoT())
+	cfg := configurator.NewMockConfigurator(mockController)
+	certManager := tresor.NewFakeCertManager(cfg)
+
 	kubeClient := fake.NewSimpleClientset()
-	err := createOrUpdateMutatingWebhook(kubeClient, cert, webhookTimeout, webhookName, meshName, osmNamespace, osmVersion, enableReconciler)
+	err := CreateOrUpdateMutatingWebhook(kubeClient, certManager, webhookTimeout, webhookName, meshName, osmNamespace, osmVersion, enableReconciler)
 	assert.Nil(err)
 
 	webhooks, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().List(context.TODO(), metav1.ListOptions{})
@@ -489,9 +492,6 @@ var _ = Describe("Testing Injector Functions", func() {
 	meshName := "-mesh-name-"
 	osmNamespace := "-osm-namespace-"
 	webhookName := "-webhook-name-"
-	osmVersion := "-osm-version"
-	enableReconciler := false
-	webhookTimeout := int32(20)
 	admissionRequestBody := `{
   "kind": "AdmissionReview",
   "apiVersion": "admission.k8s.io/v1",
@@ -556,13 +556,12 @@ var _ = Describe("Testing Injector Functions", func() {
 
 		_, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.Background(), webhookName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		actualErr := NewMutatingWebhook(Config{}, kubeClient, certManager, kubeController, meshName, osmNamespace, webhookName, osmVersion, webhookTimeout, enableReconciler, stop, cfg)
+		actualErr := NewMutatingWebhook(Config{}, kubeClient, certManager, kubeController, meshName, osmNamespace, stop, cfg)
 		Expect(actualErr).NotTo(HaveOccurred())
 		close(stop)
 	})
 
 	It("creates new webhook with reconciler enabled", func() {
-		enableReconciler = true
 		kubeClient := fake.NewSimpleClientset()
 		var kubeController k8s.Controller
 		stop := make(chan struct{})
@@ -572,7 +571,7 @@ var _ = Describe("Testing Injector Functions", func() {
 
 		cfg.EXPECT().GetCertKeyBitSize().Return(2048).AnyTimes()
 
-		actualErr := NewMutatingWebhook(Config{}, kubeClient, certManager, kubeController, meshName, osmNamespace, webhookName, osmVersion, webhookTimeout, enableReconciler, stop, cfg)
+		actualErr := NewMutatingWebhook(Config{}, kubeClient, certManager, kubeController, meshName, osmNamespace, stop, cfg)
 		Expect(actualErr).NotTo(HaveOccurred())
 		_, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.Background(), webhookName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())

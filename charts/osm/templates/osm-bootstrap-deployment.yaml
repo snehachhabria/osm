@@ -55,6 +55,7 @@ spec:
           args: [
             "--verbosity", "{{.Values.OpenServiceMesh.controllerLogLevel}}",
             "--osm-namespace", "{{ include "osm.namespace" . }}",
+            "--mesh-name", "{{.Values.OpenServiceMesh.meshName}}",
             "--osm-version", "{{ .Chart.AppVersion }}",
             "--ca-bundle-secret-name", "{{.Values.OpenServiceMesh.caBundleSecretName}}",
             "--certificate-manager", "{{.Values.OpenServiceMesh.certificateProvider.kind}}",
@@ -67,6 +68,11 @@ spec:
             "--cert-manager-issuer-kind", "{{.Values.OpenServiceMesh.certmanager.issuerKind}}",
             "--cert-manager-issuer-group", "{{.Values.OpenServiceMesh.certmanager.issuerGroup}}",
             "--enable-reconciler={{.Values.OpenServiceMesh.enableReconciler}}",
+            "--webhook-config-name", "{{.Values.OpenServiceMesh.webhookConfigNamePrefix}}-{{.Values.OpenServiceMesh.meshName}}",
+            "--webhook-timeout", "{{.Values.OpenServiceMesh.injector.webhookTimeoutSeconds}}",
+            "--validator-webhook-config", "{{ include "osm.validatorWebhookConfigName" . }}",
+            "--validate-traffic-target={{.Values.smi.validateTrafficTarget}}",
+            "--delete-crds={{.Values.OpenServiceMesh.deleteCrds}}",
           ]
           resources:
             limits:

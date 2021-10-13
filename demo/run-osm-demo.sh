@@ -41,6 +41,7 @@ DEPLOY_ON_OPENSHIFT="${DEPLOY_ON_OPENSHIFT:-false}"
 TIMEOUT="${TIMEOUT:-90s}"
 USE_PRIVATE_REGISTRY="${USE_PRIVATE_REGISTRY:-true}"
 PUBLISH_IMAGES="${PUBLISH_IMAGES:-true}"
+DELETE_CRDS="${DELETE_CRDS:-false}"
 
 # For any additional installation arguments. Used heavily in CI.
 optionalInstallArgs=$*
@@ -121,6 +122,7 @@ if [ "$CERT_MANAGER" = "vault" ]; then
       --set=OpenServiceMesh.envoyLogLevel="$ENVOY_LOG_LEVEL" \
       --set=OpenServiceMesh.controllerLogLevel="trace" \
       --timeout="$TIMEOUT" \
+      --set=OpenServiceMesh.deleteCrds="$DELETE_CRDS" \
       $optionalInstallArgs
 else
   # shellcheck disable=SC2086
@@ -145,6 +147,7 @@ else
       --set=OpenServiceMesh.envoyLogLevel="$ENVOY_LOG_LEVEL" \
       --set=OpenServiceMesh.controllerLogLevel="trace" \
       --timeout="$TIMEOUT" \
+      --set=OpenServiceMesh.deleteCrds="$DELETE_CRDS" \
       $optionalInstallArgs
 fi
 
